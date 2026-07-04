@@ -1,0 +1,12 @@
+build*/
+.venv/
+.qtcreator/
+CMakeLists.txt.user
+__pycache__/
+*.pyc
+.DS_Store
+ckpt/
+data/*.bin
+bench/results/local/
+scripts/pod.env
+# NOTE: tests/golden/ is committed on purpose (oracle files, tiny shapes).

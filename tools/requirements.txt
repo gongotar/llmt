@@ -1,0 +1,5 @@
+# Python tooling only (oracle + data prep). Never linked into the library.
+# torch is preinstalled on the pod image; needed locally only for gen_golden.py.
+torch>=2.4
+numpy>=1.26
+tiktoken>=0.7
