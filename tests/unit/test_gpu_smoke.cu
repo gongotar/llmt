@@ -6,7 +6,7 @@
 
 namespace {
 __global__ void scale_kernel(float* x, float a, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) x[i] *= a;
 }
 }  // namespace

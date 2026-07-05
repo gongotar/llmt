@@ -31,8 +31,8 @@ case "${1:-all}" in
         "${SSH[@]}" "$REMOTE" "cd $REMOTE_DIR && bash scripts/setup_pod.sh"
         ;;
     build) do_sync; "${SSH[@]}" "$REMOTE" "cd $REMOTE_DIR && bash scripts/ci.sh build" ;;
-    test)  do_sync; "${SSH[@]}" "$REMOTE" "cd $REMOTE_DIR && bash scripts/ci.sh" ;;
+    test)  do_sync; "${SSH[@]}" "$REMOTE" "cd $REMOTE_DIR && VERBOSE=${VERBOSE:-} bash scripts/ci.sh" ;;
     shell) "${SSH[@]}" -t "$REMOTE" "cd $REMOTE_DIR 2>/dev/null; exec bash -l" ;;
-    all)   do_sync; "${SSH[@]}" "$REMOTE" "cd $REMOTE_DIR && bash scripts/ci.sh" ;;
+    all)   do_sync; "${SSH[@]}" "$REMOTE" "cd $REMOTE_DIR && VERBOSE=${VERBOSE:-} bash scripts/ci.sh" ;;
     *)     echo "usage: $0 sync|setup|build|test|shell|all" >&2; exit 1 ;;
 esac

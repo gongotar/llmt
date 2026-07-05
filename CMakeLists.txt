@@ -5,6 +5,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Warnings everywhere (host C++ directly; CUDA host-side code via -Xcompiler).
+add_compile_options(
+    "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>"
+    "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-Wall,-Wextra>"
+)
+
 # CUDA is optional at configure time so the repo also configures on the
 # (CUDA-less) macOS dev host; all GPU targets are gated on LLMT_HAS_CUDA.
 include(CheckLanguage)
@@ -32,6 +38,11 @@ add_library(llmt STATIC
 target_include_directories(llmt PUBLIC include)
 
 if(LLMT_HAS_CUDA)
+    target_sources(llmt PRIVATE
+        src/core/arena.cu
+        src/core/device.cu
+        src/core/rng.cu
+    )
     target_compile_definitions(llmt PUBLIC LLMT_HAS_CUDA=1)
     find_package(CUDAToolkit REQUIRED)
     target_link_libraries(llmt PUBLIC CUDA::cudart CUDA::cublasLt)

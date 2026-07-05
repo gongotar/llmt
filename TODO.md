@@ -9,7 +9,7 @@ Phases are ordered by dependency — later phases assume earlier ones are green.
 
 ## Current status
 
-> **Phase:** 0 ✅ done → starting Phase 1 (core/)
+> **Phase:** 1 ✅ done (reviewed) → starting Phase 2 (oracle & test infrastructure)
 > **Last updated:** 2026-07-03
 > **Notes:** Pod workflow proven end-to-end on RunPod Secure Cloud
 > (current pod: RTX A4000 `sm_86` 16 GB; preferred when available:
@@ -50,24 +50,26 @@ deliverable, not an afterthought.*
 
 ## Phase 1 — core/
 
-- [ ] 1.1 `DType` enum + `dtype_size()`; `Shape` (rank ≤ 4, `numel()`).
-- [ ] 1.2 `Tensor` non-owning view (`data`, `dtype`, `shape`, `bytes()`);
+- [x] 1.1 `DType` enum + `dtype_size()`; `Shape` (rank ≤ 4, `numel()`).
+- [x] 1.2 `Tensor` non-owning view (`data`, `dtype`, `shape`, `bytes()`);
       contiguous row-major only — no strides, by design.
-- [ ] 1.3 `Device`: device selection, properties snapshot (SM count, peak
+- [x] 1.3 `Device`: device selection, properties snapshot (SM count, peak
       FLOPs/BW from 0.1 constants keyed by arch), stream creation, cuBLASLt
       handle lifetime.
-- [ ] 1.4 `Arena`: single `cudaMalloc`, 256-byte-aligned bump allocation,
+- [x] 1.4 `Arena`: single `cudaMalloc`, 256-byte-aligned bump allocation,
       `reset()`, high-water-mark report. Two planned instances: persistent
       (params/opt) and activations.
-- [ ] 1.5 `Rng`: Philox counter-based; `uniform(seed, stream_id, offset)` and
+- [x] 1.5 `Rng`: Philox counter-based; `uniform(seed, stream_id, offset)` and
       `normal(...)` (Box–Muller) device functions + fill kernels.
-- [ ] 1.6 `RunCtx` struct wired (stream, blas, arena ref, precision, backend,
+- [x] 1.6 `RunCtx` struct wired (stream, blas, arena ref, precision, backend,
       seed, step).
-- [ ] 1.7 `PrecisionPolicy` (fp32-everything for M1, but the type exists and is
+- [x] 1.7 `PrecisionPolicy` (fp32-everything for M1, but the type exists and is
       queried, per invariant 3).
-- [ ] 1.8 Tests: Arena alignment/offsets/reset; Rng mean/variance sanity +
-      bitwise reproducibility (same counters → same bits, twice).
-- [ ] **Exit: core unit tests green on GPU box.**
+- [x] 1.8 Tests: Arena alignment/offsets/reset; Rng mean/variance sanity +
+      bitwise reproducibility (same counters → same bits, twice); Device
+      sanity (device found, SM count > 0, peak FLOPs/BW positive, stream +
+      cuBLASLt handle created, `make_ctx` wiring).
+- [x] **Exit: core unit tests green on GPU box.** (RTX 4000 Ada; incl. bitwise host↔device Philox match)
 
 ## Phase 2 — Oracle & test infrastructure (before any real kernel)
 

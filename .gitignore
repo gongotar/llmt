@@ -2,6 +2,7 @@ build*/
 .venv/
 .qtcreator/
 CMakeLists.txt.user
+.cache/
 __pycache__/
 *.pyc
 .DS_Store

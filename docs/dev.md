@@ -23,6 +23,27 @@ terminated at the end of each session without losing anything.
    anyway (we run without a volume disk), and its GPU may be taken by another
    user while stopped — treat pods as cattle.
 
+## Code style (beyond .clang-format)
+
+- Private/encapsulated class members are `m_` prefixed (`m_used`, `m_stream`);
+  transparent POD structs (Shape, Tensor, U32x4) keep plain field names.
+- `noexcept` on every function that cannot throw (our error paths `abort()`,
+  they never throw — so nearly everything qualifies; keep it truthful).
+- `const` on every local that is never reassigned.
+- Headers never use unnamed namespaces (ODR trap) — internal-but-in-header
+  code goes in `namespace detail`; `.cu`/`.cpp` internals use unnamed
+  namespaces.
+- C++ standard is pinned to 20: nvcc 12.4's ceiling. Do not raise it until
+  the CUDA toolchain does.
+
+## Git workflow
+
+Remote: `git@github.com:gongotar/llmt.git` (GPL-3.0). Commit and push after
+each meaningful chunk — typically at phase exit and after notable mid-phase
+landings. To keep GPU spend low, write code Mac-side (host-only builds catch
+C++ errors), then start a pod and run the full GPU test batch when a phase's
+tests are ready; commit only green states.
+
 ## Local (Mac) builds
 
 `cmake -S . -B build && cmake --build build` works host-side: CUDA is
