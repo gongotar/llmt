@@ -51,7 +51,7 @@ LLMT_HD constexpr U32x4 philox(uint64_t seed, uint64_t stream_id, uint64_t index
             static_cast<uint32_t>(stream_id), static_cast<uint32_t>(stream_id >> 32)};
     uint32_t k0 = static_cast<uint32_t>(seed);
     uint32_t k1 = static_cast<uint32_t>(seed >> 32);
-#ifdef __CUDACC__
+#ifdef __CUDA_ARCH__  // device pass only: nvcc's host pass (g++) doesn't know it
 #pragma unroll
 #endif
     for (int r = 0; r < 10; ++r) {

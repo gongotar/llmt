@@ -9,7 +9,7 @@ Phases are ordered by dependency — later phases assume earlier ones are green.
 
 ## Current status
 
-> **Phase:** 1 ✅ done (reviewed) → starting Phase 2 (oracle & test infrastructure)
+> **Phase:** 2 ✅ done (reviewed) → starting Phase 3 (ParamStore)
 > **Last updated:** 2026-07-03
 > **Notes:** Pod workflow proven end-to-end on RunPod Secure Cloud
 > (current pod: RTX A4000 `sm_86` 16 GB; preferred when available:
@@ -73,21 +73,21 @@ deliverable, not an afterthought.*
 
 ## Phase 2 — Oracle & test infrastructure (before any real kernel)
 
-- [ ] 2.1 Golden file format spec (`docs/golden.md`): raw little-endian `.bin`
+- [x] 2.1 Golden file format spec (`docs/golden.md`): raw little-endian `.bin`
       per tensor + `manifest.json` (name, shape, dtype, seed, torch version,
       tolerance overrides).
-- [ ] 2.2 `tools/gen_golden.py` framework: case registry, deterministic seeding,
+- [x] 2.2 `tools/gen_golden.py` framework: case registry, deterministic seeding,
       `dump(name, tensor)` helper; `--case X` regeneration of a single case.
-- [ ] 2.3 C++ side: `GoldenCase` loader (manifest + tensors → host buffers) and
+- [x] 2.3 C++ side: `GoldenCase` loader (manifest + tensors → host buffers) and
       `assert_allclose(actual, expected, rtol, atol)` reporting max abs/rel
       diff and first offending index.
-- [ ] 2.4 Determinism harness: run a callable twice into two buffers, compare
+- [x] 2.4 Determinism harness: run a callable twice into two buffers, compare
       bitwise, report first diverging byte.
-- [ ] 2.5 Finite-difference gradient checker (host-side helper, micro shapes).
-- [ ] 2.6 First end-to-end proof: goldens for a trivial op (e.g. `y = 2x`)
+- [x] 2.5 Finite-difference gradient checker (host-side helper, micro shapes).
+- [x] 2.6 First end-to-end proof: goldens for a trivial op (e.g. `y = 2x`)
       generated, committed, loaded, and diffed in a C++ test.
-- [ ] **Exit: adding a new golden-tested kernel is a ~15-line Python case + a
-      ~20-line C++ test.**
+- [x] **Exit: adding a new golden-tested kernel is a ~15-line Python case + a
+      ~20-line C++ test.** (scale2x proves the pipeline; template in docs/golden.md)
 
 ## Phase 3 — ParamStore
 

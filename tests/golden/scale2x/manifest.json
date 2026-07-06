@@ -1,0 +1,20 @@
+{
+  "case": "scale2x",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "x": {
+      "shape": [
+        8,
+        16
+      ],
+      "dtype": "float32"
+    },
+    "y": {
+      "shape": [
+        8,
+        16
+      ],
+      "dtype": "float32"
+    }
+  }
+}
