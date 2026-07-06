@@ -1,4 +1,6 @@
-// Error-checking macros for CUDA / cuBLASLt calls (DESIGN.md task 0.6).
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
+// Error-checking macros for CUDA / cuBLASLt calls (docs/DESIGN.md task 0.6).
 // Every runtime API call in the library goes through one of these.
 #pragma once
 

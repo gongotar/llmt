@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 // GPU-side core tests: Arena, Device, Rng device fills (Phase 1 exit).
 #include <cstring>
 #include <vector>

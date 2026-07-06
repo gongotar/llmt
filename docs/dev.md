@@ -25,6 +25,13 @@ terminated at the end of each session without losing anything.
 
 ## Code style (beyond .clang-format)
 
+- Every source file starts with the two-line SPDX header
+  (`AGPL-3.0-only`, copyright) — except `third_party/` (own licenses),
+  golden binaries, and markdown docs. See `LICENSING.md` (dual licensing).
+- Classes/functions in library headers get Doxygen `/** … */` comments:
+  prose-first, 1–3 sentences of behavior; `@param`/`@return` only where the
+  signature isn't self-explanatory (e.g. the RNG triple). No ceremony
+  ("@brief Gets the stream." is noise). Tests and scripts use plain comments.
 - Private/encapsulated class members are `m_` prefixed (`m_used`, `m_stream`);
   transparent POD structs (Shape, Tensor, U32x4) keep plain field names.
 - `noexcept` on every function that cannot throw (our error paths `abort()`,

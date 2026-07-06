@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 // Central-difference gradient checker (task 2.5). Host-side; used from
 // Phase 4 onward to sanity-check analytic backward passes on micro shapes
 // (catches oracle-script bugs that golden tests alone would miss).

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 #pragma once
 
 #include <cstddef>
@@ -5,10 +7,14 @@
 
 namespace llmt {
 
-// FP32 is all M1 computes in; I32 carries token ids (Phases 6/10);
-// BF16 is declared for the M2 mixed-precision seam but accepted by no kernel yet.
+/**
+ * Element type of tensor data. FP32 is all M1 computes in; I32 carries token
+ * ids (Phases 6/10); BF16 is declared for the M2 mixed-precision seam but
+ * accepted by no kernel yet.
+ */
 enum class DType : uint8_t { FP32, BF16, I32 };
 
+/** Bytes per element; 0 for out-of-range codes (usable as a validity probe). */
 constexpr size_t dtype_size(DType d) noexcept {
     switch (d) {
         case DType::FP32: return 4;
@@ -18,6 +24,7 @@ constexpr size_t dtype_size(DType d) noexcept {
     return 0;  // unreachable
 }
 
+/** Short lowercase name ("fp32") for logs, reports and file formats. */
 constexpr const char* dtype_name(DType d) noexcept {
     switch (d) {
         case DType::FP32: return "fp32";
@@ -27,8 +34,10 @@ constexpr const char* dtype_name(DType d) noexcept {
     return "?";
 }
 
-// Compile-time C++ type ↔ DType pairing. Deliberately has no primary
-// definition: ptr<T>() with an unmapped T is a compile error.
+/**
+ * Compile-time C++ type ↔ DType pairing. Deliberately has no primary
+ * definition: ptr<T>() with an unmapped T is a compile error.
+ */
 template <typename T>
 struct dtype_of;
 template <>

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2026 Masoud Jami
 # Dev loop against the GPU pod (task 0.2). Usage:
 #   scripts/remote.sh sync|setup|build|test|shell|all
 # Pod endpoint comes from scripts/pod.env (gitignored, changes per pod):

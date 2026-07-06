@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2026 Masoud Jami
 # Build + test in one command (task 0.9). Runs on the GPU pod (or any machine).
 #   scripts/ci.sh         # configure + build + run all tests
 #   scripts/ci.sh build   # configure + build only

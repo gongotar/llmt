@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 // Phase 0 GPU smoke test: device visible, kernel launches, D2H roundtrip works.
 #include "doctest.h"
 #include "llmt/core/error.h"

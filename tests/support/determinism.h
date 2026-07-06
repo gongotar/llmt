@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 // Bitwise-determinism harness (task 2.4): run the same GPU work twice into
 // fresh buffers and locate the first diverging byte, if any.
 #pragma once

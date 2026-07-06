@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 // Golden-file loading + numeric comparison (tasks 2.3). Test infrastructure —
 // lives under tests/, never ships. Format: docs/golden.md.
 #pragma once

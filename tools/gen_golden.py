@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2026 Masoud Jami
 """Golden-file generator (task 2.2). PyTorch is the oracle — never linked.
 
 Usage:

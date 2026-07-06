@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2026 Masoud Jami
 add_executable(llmt_tests
     test_main.cpp
     support/golden_io.cpp

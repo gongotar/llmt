@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 #include "llmt/core/device.h"
 #include "llmt/core/error.h"
 

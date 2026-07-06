@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 #pragma once
 
 #include <cassert>
@@ -8,9 +10,11 @@
 
 namespace llmt {
 
-// Fixed-capacity shape: rank <= 4 covers every tensor a decoder-only
-// transformer needs (see docs/knowledge.md). A stack value type — copyable
-// straight into kernel arguments, no heap.
+/**
+ * Fixed-capacity tensor shape: rank <= 4 covers every tensor a decoder-only
+ * transformer needs (see docs/knowledge.md). A stack value type — copyable
+ * straight into kernel arguments, no heap.
+ */
 struct Shape {
     static constexpr int kMaxRank = 4;
 
@@ -28,8 +32,10 @@ struct Shape {
         return d[i];
     }
 
-    // Number of elements: product of dims. Rank 0 (default-constructed,
-    // "no shape yet") deliberately yields 0 so uninitialized use is loud.
+    /**
+     * Number of elements: product of dims. Rank 0 (default-constructed,
+     * "no shape yet") deliberately yields 0 so uninitialized use is loud.
+     */
     LLMT_HD int64_t numel() const noexcept {
         if (rank == 0) return 0;
         int64_t n = 1;

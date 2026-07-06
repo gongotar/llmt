@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 #pragma once
 
 #ifdef LLMT_HAS_CUDA
@@ -11,9 +13,11 @@
 
 namespace llmt {
 
-// Snapshot of what benchmarks and MFU math need to know about the GPU.
-// Peaks are computed from device attributes (docs/hardware.md holds the
-// datasheet cross-check; Phase 5 replaces both with measured numbers).
+/**
+ * Snapshot of what benchmarks and MFU math need to know about the GPU.
+ * Peaks are computed from device attributes (docs/hardware.md holds the
+ * datasheet cross-check; Phase 5 replaces both with measured numbers).
+ */
 struct DeviceProps {
     std::string name;
     int sm_major = 0, sm_minor = 0;
@@ -23,8 +27,10 @@ struct DeviceProps {
     double peak_bw_gbs = 0.0;
 };
 
-// Owns the per-GPU runtime state: the stream all M1 work runs on
-// (DESIGN invariant 7: explicit, single) and the cuBLASLt handle.
+/**
+ * Owns the per-GPU runtime state: the stream all M1 work runs on
+ * (DESIGN invariant 7: explicit, single) and the cuBLASLt handle.
+ */
 class Device {
    public:
     explicit Device(int index = 0) noexcept;
@@ -37,11 +43,13 @@ class Device {
     cublasLtHandle_t blas() const noexcept { return m_blas; }
     int index() const noexcept { return m_index; }
 
-    // Activation arena stays null here — it is owned by the model and
-    // attached once planning has run (DESIGN §8.2).
-    // All three deliberately have no defaults: seed comes from TrainConfig,
-    // backend from RunConfig, precision from TrainConfig — wiring should be
-    // visible at the call site, not silently defaulted.
+    /**
+     * Builds a RunCtx around this device's stream and blas handle. The
+     * activation arena stays null — it is owned by the model and attached
+     * once planning has run (DESIGN §8.2). Parameters deliberately have no
+     * defaults: seed and precision come from TrainConfig, backend from
+     * RunConfig — wiring should be visible at the call site.
+     */
     RunCtx make_ctx(uint64_t seed, KernelBackend backend,
                     PrecisionPolicy precision) const noexcept;
 

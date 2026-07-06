@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2026 Masoud Jami
 cmake_minimum_required(VERSION 3.24)
 project(llmt VERSION 0.1.0 LANGUAGES CXX)
 

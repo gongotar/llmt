@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 // Counter-based RNG (DESIGN invariants 4 & 5): Philox4x32-10.
 //
 // Stateless: value = f(seed, stream_id, index). Same inputs → same bits,
@@ -15,6 +17,7 @@
 
 namespace llmt::rng {
 
+/** One 128-bit Philox output block: four independent uniform u32s. */
 struct U32x4 {
     uint32_t x, y, z, w;
 };
@@ -30,12 +33,13 @@ struct U32HiLo {
     uint32_t lo, hi;
 };
 
-// Full 64-bit product of two u32s, split into halves (both are used by Philox).
+/** Full 64-bit product of two u32s, split into halves (Philox uses both). */
 LLMT_HD constexpr U32HiLo mulhilo(uint32_t a, uint32_t b) noexcept {
     const uint64_t p = static_cast<uint64_t>(a) * b;
     return {static_cast<uint32_t>(p), static_cast<uint32_t>(p >> 32)};
 }
 
+/** One Philox round: multiply-based scramble + key XOR + lane swap. */
 LLMT_HD constexpr U32x4 philox_round(U32x4 c, uint32_t k0, uint32_t k1) noexcept {
     const auto [lo0, hi0] = mulhilo(kPhiloxM0, c.x);
     const auto [lo1, hi1] = mulhilo(kPhiloxM1, c.z);
@@ -44,8 +48,14 @@ LLMT_HD constexpr U32x4 philox_round(U32x4 c, uint32_t k0, uint32_t k1) noexcept
 
 }  // namespace detail
 
-// Philox4x32-10: 128-bit counter (stream_id, index) + 64-bit key (seed)
-// → 4 independent uniform u32s. 10 rounds.
+/**
+ * Philox4x32-10: encrypts a 128-bit counter under a 64-bit key (10 rounds).
+ * @param seed       the key — which universe of randomness (one per run)
+ * @param stream_id  counter high half — which consumer (a parameter tensor,
+ *                   a dropout site); decouples consumers from memory layout
+ * @param index      counter low half — which element within that consumer
+ * @return four independent uniform u32s
+ */
 LLMT_HD constexpr U32x4 philox(uint64_t seed, uint64_t stream_id, uint64_t index) noexcept {
     U32x4 c{static_cast<uint32_t>(index), static_cast<uint32_t>(index >> 32),
             static_cast<uint32_t>(stream_id), static_cast<uint32_t>(stream_id >> 32)};
@@ -62,20 +72,22 @@ LLMT_HD constexpr U32x4 philox(uint64_t seed, uint64_t stream_id, uint64_t index
     return c;
 }
 
-// u32 → float in [0, 1): top 24 bits (float's mantissa width) scaled down.
+/** u32 → float in [0, 1): top 24 bits (float's mantissa width) scaled down. */
 LLMT_HD constexpr float to_uniform(uint32_t u) noexcept {
     return static_cast<float>(u >> 8) * (1.0f / 16777216.0f);  // 2^-24
 }
 
-// One uniform float in [0,1) per (seed, stream_id, index).
+/** One uniform float in [0, 1) per (seed, stream_id, index). */
 LLMT_HD constexpr float uniform(uint64_t seed, uint64_t stream_id, uint64_t index) noexcept {
     return to_uniform(philox(seed, stream_id, index).x);
 }
 
-// One standard-normal float per (seed, stream_id, index), via Box–Muller.
-// Note: uses logf/cosf/sqrtf, whose device implementations may differ from
-// host libm by ULPs — bitwise host↔device identity is guaranteed only for
-// philox()/uniform(); normal() is bitwise-reproducible per side.
+/**
+ * One standard-normal float per (seed, stream_id, index), via Box–Muller.
+ * Uses logf/cosf/sqrtf, whose device implementations may differ from host
+ * libm by ULPs — bitwise host↔device identity is guaranteed only for
+ * philox()/uniform(); normal() is bitwise-reproducible per side.
+ */
 LLMT_HD inline float normal(uint64_t seed, uint64_t stream_id, uint64_t index) noexcept {
     const U32x4 r = philox(seed, stream_id, index);
     // NOTE: shifts BEFORE the +1 so the result is in (0,1] with no possible
@@ -93,7 +105,10 @@ LLMT_HD inline float normal(uint64_t seed, uint64_t stream_id, uint64_t index) n
 
 namespace llmt::rng {
 
-// Device fill helpers. Future consumers: weight init (Phase 3), dropout (M2).
+/**
+ * Fill dst[0..n) on stream s with one RNG value per index. Future consumers:
+ * weight init (Phase 3), dropout (M2).
+ */
 void fill_uniform(cudaStream_t s, float* dst, int64_t n, uint64_t seed,
                   uint64_t stream_id) noexcept;
 void fill_normal(cudaStream_t s, float* dst, int64_t n, uint64_t seed, uint64_t stream_id,

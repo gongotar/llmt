@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (c) 2026 Masoud Jami
 # Idempotent pod environment bootstrap (task 0.2). Runs ON the pod.
 # Assumes the RunPod PyTorch -devel image (CUDA toolkit + torch preinstalled).
 set -euo pipefail

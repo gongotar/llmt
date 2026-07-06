@@ -1,5 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 // llmt — LLM training library. Public umbrella header.
-// Grows as components land (see DESIGN.md §7); everything lives in namespace llmt.
+// Grows as components land (see docs/DESIGN.md §7); everything lives in namespace llmt.
 #pragma once
 
 #include "llmt/core/dtype.h"
@@ -17,7 +19,7 @@
 
 namespace llmt {
 
-// Library version, defined in src/core/version.cpp.
+/** Library version string ("0.1.0-dev"); defined in src/core/version.cpp. */
 const char* version() noexcept;
 
 }  // namespace llmt

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 // Host-side proof of the golden pipeline: loader + allclose + finite-diff
 // checker, no GPU needed (runs on the Mac).
 #include <cmath>

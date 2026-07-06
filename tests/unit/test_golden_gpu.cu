@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2026 Masoud Jami
 // End-to-end proof of the golden pipeline on the GPU (task 2.6):
 // PyTorch wrote x and y=2x → our kernel computes 2x on device → allclose.
 // Also exercises the determinism harness against the Rng fills.
