@@ -78,6 +78,59 @@ kernels are compile-time typed inside; dtype is static per run (frozen list),
 so CUDA graphs / fusion / JIT capture concrete kernels and the switch cost is
 erased on replay.
 
+## Parameters: roles, init, weight decay
+
+**Parameters** (= weights) are the adjustable numbers training nudges; the
+model is ~30M of them, all registered in ParamStore. **Activations** are
+computed per forward pass from inputs × parameters — parameters are stored
+and initialized; activations are transient and never "initialized".
+
+**Residual stream**: each block amends its input rather than replacing it —
+`output = x + f(x)`. The flowing `x` `[B,T,C]` is a per-token "whiteboard"
+every block adds a suggestion onto. `wo` (attention output projection) and
+the MLP down-projection are the *last matrices inside* `f` — their product
+is what lands on the whiteboard, so they're tagged `Role::ResidualProj`.
+At init, shrinking those matrices (σ = 0.02/√(2L)) shrinks the 2L random
+additions and keeps the stream's variance flat across depth. (The matrices
+are directly random-initialized; `f(x)` inherits randomness through them.)
+
+**Norms** are volume regulators: RMSNorm divides each token vector by its
+own rms (standard "volume" regardless of stream drift — softmax hates wild
+scales), then multiplies channel-wise by a learnable `g[C]`. Init `g = 1` =
+"no exceptions yet, change nothing" — the multiplicative neutral.
+
+**Weight decay**: `w ← w − lr·grad − lr·λ·w` — every weight shrinks by
+`lr·λ` (≈0.003%/step) unless gradients keep re-funding it. Rent economy:
+recurring patterns earn their rent, one-off memorizations (large, finely
+tuned weights = jagged, overfit functions) dissolve. Exemptions where
+"smaller ≠ simpler": Norm `g` (neutral is 1, not 0) and embeddings (rare
+tokens pay rent every step but earn income rarely).
+
+### Parameter reference (M1 model: L=6, C=384, V=50304, d_ff=1536)
+
+| Name | Shape | Role | Meaning |
+|---|---|---|---|
+| `embed.wte` | [V,C] | Embedding | **w**ord **t**oken **e**mbeddings — token lookup table (GPT-2 name) |
+| `blk{b}.norm1.g` / `norm2.g` | [C] | Norm | RMSNorm scales before attention / MLP |
+| `blk{b}.attn.wq/wk/wv` | [C,C] | Matrix | query ("what am I looking for") / key ("what do I offer") / value ("what do I contribute") projections |
+| `blk{b}.attn.wo` | [C,C] | ResidualProj | attention output projection → residual stream |
+| `blk{b}.mlp.w_up` | [d_ff,C] | Matrix | widen C → d_ff |
+| `blk{b}.mlp.w_down` | [C,d_ff] | ResidualProj | narrow back, → residual stream |
+| `final_norm.g` | [C] | Norm | last norm before scoring |
+| `lm_head.w` | alias→wte | — | scoring matrix (weight tying) |
+
+50 tensors, ~30M elements (embedding ≈ 19M). No `wpe` (GPT-2's positional
+embeddings) — RoPE computes positions instead of storing them.
+
+**normal(0, 0.02)**: theory (Xavier/He) says σ ≈ 1/√C to keep variance
+steady through `y = xW`; GPT-2 fixed 0.02 for all sizes and it became the
+convention every reproduction matches (incl. us — oracle comparability).
+
+**C = 384, 6 heads, 6 layers**: the classic tiny-GPT config (nanoGPT's
+TinyShakespeare model) — head dim 64 is the field-wide standard, ~30M
+params, minutes to train. `lr` (3e-4) = global step size; `λ` (0.1) =
+weight-decay rent coefficient; effective shrink per step is `lr·λ`.
+
 ## CUDA fundamentals (as encountered in this codebase)
 
 - **Kernel launch** `k<<<blocks, threads>>>(args)`: grid of blocks × threads;

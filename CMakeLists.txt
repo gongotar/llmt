@@ -44,6 +44,9 @@ if(LLMT_HAS_CUDA)
         src/core/arena.cu
         src/core/device.cu
         src/core/rng.cu
+        src/kernels/fill.cu
+        src/model/init.cpp
+        src/model/param_store.cpp
     )
     target_compile_definitions(llmt PUBLIC LLMT_HAS_CUDA=1)
     find_package(CUDAToolkit REQUIRED)

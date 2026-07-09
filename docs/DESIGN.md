@@ -337,8 +337,13 @@ public:
 **ParamStore** (model/)
 - Registration phase: each layer calls
   `store.add("blk3.attn.wq", {C, C}, Role::Matrix)` → returns a `Param`
-  (weight view + grad view). After registration, `finalize()` does exactly
-  three `cudaMalloc`s (params, grads, opt-state) and fixes all offsets.
+  (weight view + grad view; views become valid at finalize). After
+  registration, `finalize()` makes **one** device allocation (a private
+  Arena) carved into four 256B-aligned spans — params, grads, Adam m,
+  Adam v — each packing all parameters in registration order (spans of
+  equal dtype share per-parameter offsets), zero-filled at creation.
+  Alignment padding inside the spans stays zero for the store's lifetime,
+  so flat-span reductions/updates read only inert zeros (invariant 5).
 - Provides: named lookup (checkpoint I/O, tests), iteration by role
   (param groups, init), flat spans (fused optimizer step, clipping, future NCCL).
 - Aliasing: `store.alias("lm_head.w", "embed.wte")` for weight tying — both

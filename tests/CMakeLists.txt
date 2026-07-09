@@ -12,6 +12,7 @@ if(LLMT_HAS_CUDA)
         unit/test_gpu_smoke.cu
         unit/test_core_gpu.cu
         unit/test_golden_gpu.cu
+        unit/test_param_store.cu
     )
 endif()
 target_link_libraries(llmt_tests PRIVATE llmt)

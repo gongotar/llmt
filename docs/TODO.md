@@ -9,7 +9,7 @@ Phases are ordered by dependency — later phases assume earlier ones are green.
 
 ## Current status
 
-> **Phase:** 2 ✅ done (reviewed) → starting Phase 3 (ParamStore)
+> **Phase:** 3 ✅ done (reviewed) → starting Phase 4 (GEMM wrapper + Linear)
 > **Last updated:** 2026-07-03
 > **Notes:** Pod workflow proven end-to-end on RunPod Secure Cloud
 > (current pod: RTX A4000 `sm_86` 16 GB; preferred when available:
@@ -91,22 +91,22 @@ deliverable, not an afterthought.*
 
 ## Phase 3 — ParamStore
 
-- [ ] 3.1 Registration API: `add(name, shape, Role) → Param{weight, grad}`
+- [x] 3.1 Registration API: `add(name, shape, Role) → Param{weight, grad}`
       (views become valid only after finalize).
-- [ ] 3.2 `finalize()`: exactly three allocations (params, grads, m+v),
+- [x] 3.2 `finalize()`: single allocation, four per-kind-packed spans (see DESIGN §8.2 as amended),
       alignment, fixed offsets; registration is closed afterwards.
-- [ ] 3.3 Named lookup + iteration by `Role` (Embedding / Matrix / Norm) +
+- [x] 3.3 Named lookup + iteration by `Role` (Embedding / Matrix / Norm) +
       flat spans (`params_flat()`, `grads_flat()`, opt-state spans).
-- [ ] 3.4 **Aliasing** for weight tying: `alias("lm_head.w", "embed.wte")` —
+- [x] 3.4 **Aliasing** for weight tying: `alias("lm_head.w", "embed.wte")` —
       two names, one span; document the grad-accumulation contract
       (invariant 9); test that both names see the same memory.
-- [ ] 3.5 Init (`model/init.cu`): role-keyed — normal(0, 0.02) for
+- [x] 3.5 Init (`model/init.cu`): role-keyed — normal(0, 0.02) for
       matrices/embeddings, ones for norm weights, residual-projection scaling
       `0.02/√(2L)` (wo, mlp down-proj); uses Rng; per-tensor stream_id so init
       is layout-independent.
-- [ ] 3.6 Tests: offsets/alignment, lookup, role iteration, alias identity,
+- [x] 3.6 Tests: offsets/alignment, lookup, role iteration, alias identity,
       init statistics (mean/std within tolerance), init bitwise-reproducible.
-- [ ] **Exit: a toy 2-tensor model registers, finalizes, inits reproducibly.**
+- [x] **Exit: a toy 2-tensor model registers, finalizes, inits reproducibly.** (22 cases green on RTX 4000 Ada; layout-independent bitwise init proven)
 
 ## Phase 4 — GEMM wrapper + Linear
 

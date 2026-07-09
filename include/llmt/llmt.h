@@ -15,6 +15,9 @@
 #include "llmt/core/device.h"
 #include "llmt/core/error.h"
 #include "llmt/core/run_ctx.h"
+#include "llmt/kernels/fill.h"
+#include "llmt/model/init.h"
+#include "llmt/model/param_store.h"
 #endif
 
 namespace llmt {
