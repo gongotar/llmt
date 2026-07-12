@@ -7,6 +7,7 @@
 #include <cublasLt.h>
 #include <cuda_runtime.h>
 
+#include <memory>
 #include <string>
 
 #include "llmt/core/run_ctx.h"
@@ -29,10 +30,13 @@ struct DeviceProps {
 
 /**
  * Owns the per-GPU runtime state: the stream all M1 work runs on
- * (DESIGN invariant 7: explicit, single) and the cuBLASLt handle.
+ * (DESIGN invariant 7: explicit, single), the cuBLASLt handle and its
+ * workspace buffer.
  */
 class Device {
    public:
+    static constexpr size_t kBlasWorkspaceBytes = 32ull << 20;  // 32 MiB
+
     explicit Device(int index = 0) noexcept;
     ~Device();
     Device(const Device&) = delete;
@@ -60,6 +64,8 @@ class Device {
     DeviceProps m_props;
     cudaStream_t m_stream = nullptr;
     cublasLtHandle_t m_blas = nullptr;
+    void* m_blas_workspace = nullptr;
+    std::unique_ptr<kernels::AlgoCache> m_algo_cache;
 };
 
 }  // namespace llmt

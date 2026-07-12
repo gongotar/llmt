@@ -9,7 +9,7 @@ Phases are ordered by dependency — later phases assume earlier ones are green.
 
 ## Current status
 
-> **Phase:** 3 ✅ done (reviewed) → starting Phase 4 (GEMM wrapper + Linear)
+> **Phase:** 4 ✅ done (reviewed) → starting Phase 5 (elementwise & norm kernels)
 > **Last updated:** 2026-07-03
 > **Notes:** Pod workflow proven end-to-end on RunPod Secure Cloud
 > (current pod: RTX A4000 `sm_86` 16 GB; preferred when available:
@@ -110,22 +110,22 @@ deliverable, not an afterthought.*
 
 ## Phase 4 — GEMM wrapper + Linear
 
-- [ ] 4.1 `matmul()` wrapper over cuBLASLt: row-major convention mapping
+- [x] 4.1 `matmul()` wrapper over cuBLASLt: row-major convention mapping
       (document the weight-layout convention here — this file is the single
       source of truth), transpose flags, `beta` ∈ {0,1} for grad accumulation,
       workspace from arena.
-- [ ] 4.2 Algo cache: heuristic resolved once per (shape, trans, dtype) key,
+- [x] 4.2 Algo cache: heuristic resolved once per (shape, trans, dtype) key,
       cached for the run (determinism, invariant 5).
-- [ ] 4.3 Batched-strided variant (needed by attention in Phase 6).
-- [ ] 4.4 Correctness test vs golden (`torch.matmul`, several shapes incl.
+- [x] 4.3 Batched-strided variant (needed by attention in Phase 6).
+- [x] 4.4 Correctness test vs golden (`torch.matmul`, several shapes incl.
       non-square, both transposes).
-- [ ] 4.5 Micro-benchmark: achieved TFLOPs vs peak for model-relevant shapes
+- [x] 4.5 Micro-benchmark: achieved TFLOPs vs peak for model-relevant shapes
       (records our "cuBLAS-bound" ceiling for MFU context).
-- [ ] 4.6 `Linear` layer (no bias): `forward` `y = x·Wᵀ`; `backward`
+- [x] 4.6 `Linear` layer (no bias): `forward` `y = x·Wᵀ`; `backward`
       `dx = dy·W`, `dW += dyᵀ·x` (beta=1 into flat grads).
-- [ ] 4.7 Golden test: Linear fwd + bwd (dx, dW) vs PyTorch.
-- [ ] **Exit: Linear fwd/bwd matches oracle at 1e-5 rel; GEMM ceiling
-      documented.**
+- [x] 4.7 Golden test: Linear fwd + bwd (dx, dW) vs PyTorch.
+- [x] **Exit: Linear fwd/bwd matches oracle at 1e-5 rel; GEMM ceiling
+      documented.** (27 cases green; model GEMMs at 92–97% of measured ceiling)
 
 ## Phase 5 — Elementwise & norm kernels (forward)
 
@@ -318,4 +318,5 @@ test + finite-difference spot check. After each landing: determinism check
 | Fused kernels (add+norm, rope+qkv) + `KernelBackend::Fused` cross-checks | M2 |
 | KV cache for generation | M2/M3 |
 | Flash-style attention, activation-buffer reuse/checkpointing | M3 |
+| Cache cuBLASLt descriptors alongside the cached algo (entries become RAII owners of 4 Lt handles). Trigger: profiling shows host-bound gaps between kernels (attention GEMMs most likely). Superseded entirely if CUDA graphs land | M3 |
 | NCCL data parallel, ZeRO-1 | M4 |

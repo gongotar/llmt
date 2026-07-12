@@ -13,6 +13,8 @@ if(LLMT_HAS_CUDA)
         unit/test_core_gpu.cu
         unit/test_golden_gpu.cu
         unit/test_param_store.cu
+        unit/test_matmul.cu
+        unit/test_linear.cu
     )
 endif()
 target_link_libraries(llmt_tests PRIVATE llmt)

@@ -58,6 +58,7 @@ TEST_CASE("Device: sane properties, stream, blas handle, ctx wiring") {
 
     CHECK(dev.stream() != nullptr);
     CHECK(dev.blas() != nullptr);
+    CHECK(Device::kBlasWorkspaceBytes > 0);
 
     const RunCtx ctx =
         dev.make_ctx(/*seed=*/1337, KernelBackend::Naive, PrecisionPolicy::fp32());
@@ -65,6 +66,9 @@ TEST_CASE("Device: sane properties, stream, blas handle, ctx wiring") {
     CHECK(ctx.blas == dev.blas());
     CHECK(ctx.seed == 1337);
     CHECK(ctx.activations == nullptr);  // model attaches it after planning
+    CHECK(ctx.blas_workspace != nullptr);
+    CHECK(ctx.blas_workspace_bytes == Device::kBlasWorkspaceBytes);
+    CHECK(ctx.algo_cache != nullptr);
     CHECK(ctx.backend == KernelBackend::Naive);
 }
 

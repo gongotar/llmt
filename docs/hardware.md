@@ -29,6 +29,38 @@ results are recorded per GPU model. Current + candidate cards:
 benchmark (task 4.5) replace them with measured numbers, which are what MFU and
 %-of-peak reports use.
 
+## Measured GEMM ceiling (task 4.5 — `llmt_bench_matmul`, strict FP32)
+
+RTX A5000 (Ampere `sm_86`, computed peak 27.8 TFLOPs), 2026-07-09:
+
+| shape (M1 config) | TFLOPs | % peak |
+|---|---|---|
+| proj `[8192,384]·[384,384]ᵀ` | 14.9 | 53.8% |
+| mlp_up `[8192,384]·[1536,384]ᵀ` | 15.7 | 56.7% |
+| mlp_dn `[8192,1536]·[384,1536]ᵀ` | 15.5 | 55.7% |
+| lm_head `[8192,384]·[50304,384]ᵀ` | 13.3 | 47.7% |
+| attn QKᵀ `192×[256,64]·[256,64]ᵀ` | 9.6 | 34.4% |
+
+RTX 4000 Ada (`sm_89`, nominal 26.7 TFLOPs, 360 GB/s), 2026-07-12 — with the
+CEILING reference (4096³ square GEMM = empirical arch max):
+
+| shape | TFLOPs | % nominal | % of ceiling |
+|---|---|---|---|
+| CEILING ref | 12.83 | 48.0% | — |
+| proj | 11.86 | 44.4% | 92% |
+| mlp_up / mlp_dn | 12.4 / 12.1 | ~46% | 94–97% |
+| lm_head | 11.89 | 44.5% | 93% |
+| attn QKᵀ | 6.72 | 25.2% | ~87% of its memory roofline (360 GB/s · AI≈21 ≈ 7.7 T) |
+
+Model GEMMs run at 92–97% of the achievable ceiling: cuBLASLt-level
+orchestration leaves nothing on the table; headroom is precision-policy
+territory (TF32/BF16), not tuning.
+
+This is the "cuBLAS-bound" ceiling MFU is judged against: at these shapes,
+~50–57% of nominal peak is what perfect orchestration could reach for the
+big GEMMs; small batched attention shapes cap far lower (undersized per-SM
+work — the motivation for fused attention later). Re-measure per GPU model.
+
 ## Notes
 - Bitwise-determinism guarantees (DESIGN invariant 5) are **per-machine**;
   switching GPU models changes results within tolerance, not correctness.

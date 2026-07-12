@@ -78,6 +78,57 @@ def scale2x(w: CaseWriter):
     w.dump("y", x * 2)
 
 
+@case
+def matmul(w: CaseWriter):
+    """GEMM wrapper (task 4.4): all four transpose combos + beta accumulation.
+    Deliberately non-square with distinct dims (7,5,9) so any row/col-major
+    or operand-swap mistake changes the result shape or values."""
+    torch.manual_seed(41)
+    a = torch.randn(7, 5)    # [M, K]
+    at = torch.randn(5, 7)   # [K, M] — used transposed
+    b = torch.randn(5, 9)    # [K, N]
+    bt = torch.randn(9, 5)   # [N, K] — used transposed
+    c0 = torch.randn(7, 9)   # pre-existing C for the beta=1 case
+    for name, t in [("a", a), ("at", at), ("b", b), ("bt", bt), ("c0", c0)]:
+        w.dump(name, t)
+    w.dump("c_nn", a @ b)
+    w.dump("c_nt", a @ bt.T)
+    w.dump("c_tn", at.T @ b)
+    w.dump("c_tt", at.T @ bt.T)
+    w.dump("c_beta", c0 + a @ b)
+
+
+@case
+def matmul_rank3(w: CaseWriter):
+    """matmul() with rank-3 tensors (strided-batched, task 4.3): plain batch
+    + the QK^T pattern attention will use in Phase 6."""
+    torch.manual_seed(43)
+    a = torch.randn(3, 4, 6)
+    b = torch.randn(3, 6, 5)
+    w.dump("a", a)
+    w.dump("b", b)
+    w.dump("c", a @ b)
+    q = torch.randn(3, 4, 8)
+    k = torch.randn(3, 4, 8)
+    w.dump("q", q)
+    w.dump("k", k)
+    w.dump("scores", q @ k.transpose(-2, -1))
+
+
+@case
+def linear(w: CaseWriter):
+    """Linear layer fwd+bwd (task 4.7): y = x·W^T, grads via autograd."""
+    torch.manual_seed(47)
+    x = torch.randn(8, 12, requires_grad=True)
+    weight = torch.randn(10, 12, requires_grad=True)  # [out, in]
+    y = x @ weight.T
+    dy = torch.randn(8, 10)
+    y.backward(dy)
+    for name, t in [("x", x), ("weight", weight), ("dy", dy), ("y", y),
+                    ("dx", x.grad), ("dw", weight.grad)]:
+        w.dump(name, t)
+
+
 # ------------------------------------------------------------------ main ----
 
 

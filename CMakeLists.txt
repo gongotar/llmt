@@ -45,6 +45,8 @@ if(LLMT_HAS_CUDA)
         src/core/device.cu
         src/core/rng.cu
         src/kernels/fill.cu
+        src/kernels/matmul.cpp
+        src/layers/linear.cpp
         src/model/init.cpp
         src/model/param_store.cpp
     )
@@ -58,3 +60,4 @@ endif()
 
 enable_testing()
 add_subdirectory(tests)
+add_subdirectory(bench)

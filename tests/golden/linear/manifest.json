@@ -1,0 +1,48 @@
+{
+  "case": "linear",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "x": {
+      "shape": [
+        8,
+        12
+      ],
+      "dtype": "float32"
+    },
+    "weight": {
+      "shape": [
+        10,
+        12
+      ],
+      "dtype": "float32"
+    },
+    "dy": {
+      "shape": [
+        8,
+        10
+      ],
+      "dtype": "float32"
+    },
+    "y": {
+      "shape": [
+        8,
+        10
+      ],
+      "dtype": "float32"
+    },
+    "dx": {
+      "shape": [
+        8,
+        12
+      ],
+      "dtype": "float32"
+    },
+    "dw": {
+      "shape": [
+        10,
+        12
+      ],
+      "dtype": "float32"
+    }
+  }
+}

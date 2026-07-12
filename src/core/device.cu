@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (c) 2026 Masoud Jami
+
 #include "llmt/core/device.h"
 #include "llmt/core/error.h"
+#include "llmt/kernels/algo_cache.h"
 
 namespace llmt {
 
@@ -42,9 +44,12 @@ Device::Device(int index) noexcept : m_index(index) {
 
     CUDA_CHECK(cudaStreamCreate(&m_stream));
     CUBLAS_CHECK(cublasLtCreate(&m_blas));
+    CUDA_CHECK(cudaMalloc(&m_blas_workspace, kBlasWorkspaceBytes));
+    m_algo_cache = std::make_unique<kernels::AlgoCache>();
 }
 
 Device::~Device() {
+    if (m_blas_workspace) cudaFree(m_blas_workspace);
     if (m_blas) cublasLtDestroy(m_blas);
     if (m_stream) cudaStreamDestroy(m_stream);
 }
@@ -54,6 +59,9 @@ RunCtx Device::make_ctx(uint64_t seed, KernelBackend backend,
     RunCtx ctx;
     ctx.stream = m_stream;
     ctx.blas = m_blas;
+    ctx.blas_workspace = m_blas_workspace;
+    ctx.blas_workspace_bytes = kBlasWorkspaceBytes;
+    ctx.algo_cache = m_algo_cache.get();
     ctx.precision = precision;
     ctx.backend = backend;
     ctx.seed = seed;

@@ -11,6 +11,10 @@
 
 #include "llmt/core/precision.h"
 
+namespace llmt::kernels {
+struct AlgoCache;
+}
+
 namespace llmt {
 
 class Arena;
@@ -28,6 +32,9 @@ enum class KernelBackend : uint8_t { Naive, Fused };
 struct RunCtx {
     cudaStream_t stream = nullptr;
     cublasLtHandle_t blas = nullptr;
+    void* blas_workspace = nullptr;  // Device-owned scratch for cuBLASLt
+    size_t blas_workspace_bytes = 0;
+    kernels::AlgoCache* algo_cache = nullptr;  // Device-owned (invariant 5)
     Arena* activations = nullptr;  // owned by the model; set after planning
     PrecisionPolicy precision;
     KernelBackend backend = KernelBackend::Naive;

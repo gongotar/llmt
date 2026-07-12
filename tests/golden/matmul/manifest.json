@@ -1,0 +1,76 @@
+{
+  "case": "matmul",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "a": {
+      "shape": [
+        7,
+        5
+      ],
+      "dtype": "float32"
+    },
+    "at": {
+      "shape": [
+        5,
+        7
+      ],
+      "dtype": "float32"
+    },
+    "b": {
+      "shape": [
+        5,
+        9
+      ],
+      "dtype": "float32"
+    },
+    "bt": {
+      "shape": [
+        9,
+        5
+      ],
+      "dtype": "float32"
+    },
+    "c0": {
+      "shape": [
+        7,
+        9
+      ],
+      "dtype": "float32"
+    },
+    "c_nn": {
+      "shape": [
+        7,
+        9
+      ],
+      "dtype": "float32"
+    },
+    "c_nt": {
+      "shape": [
+        7,
+        9
+      ],
+      "dtype": "float32"
+    },
+    "c_tn": {
+      "shape": [
+        7,
+        9
+      ],
+      "dtype": "float32"
+    },
+    "c_tt": {
+      "shape": [
+        7,
+        9
+      ],
+      "dtype": "float32"
+    },
+    "c_beta": {
+      "shape": [
+        7,
+        9
+      ],
+      "dtype": "float32"
+    }
+  }
+}

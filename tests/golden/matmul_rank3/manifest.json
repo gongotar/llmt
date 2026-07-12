@@ -1,0 +1,54 @@
+{
+  "case": "matmul_rank3",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "a": {
+      "shape": [
+        3,
+        4,
+        6
+      ],
+      "dtype": "float32"
+    },
+    "b": {
+      "shape": [
+        3,
+        6,
+        5
+      ],
+      "dtype": "float32"
+    },
+    "c": {
+      "shape": [
+        3,
+        4,
+        5
+      ],
+      "dtype": "float32"
+    },
+    "q": {
+      "shape": [
+        3,
+        4,
+        8
+      ],
+      "dtype": "float32"
+    },
+    "k": {
+      "shape": [
+        3,
+        4,
+        8
+      ],
+      "dtype": "float32"
+    },
+    "scores": {
+      "shape": [
+        3,
+        4,
+        4
+      ],
+      "dtype": "float32"
+    }
+  }
+}

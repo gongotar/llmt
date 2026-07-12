@@ -11,8 +11,10 @@
 #include "llmt/core/error.h"
 #include "llmt/model/init.h"
 #include "llmt/model/param_store.h"
+#include "transfer.h"
 
 using namespace llmt;
+using namespace llmt::testing;
 
 // The name hash is a compile-time fact: distinct names → distinct streams.
 static_assert(detail::fnv1a("blk0.attn.wq") != detail::fnv1a("blk0.attn.wk"));
@@ -21,12 +23,6 @@ static_assert(detail::fnv1a("") == 0xCBF29CE484222325ull);  // FNV offset basis
 static_assert(StateDtypes::uniform(DType::FP32)[StateKind::AdamV] == DType::FP32);
 
 namespace {
-
-std::vector<float> download(const Tensor& t) {
-    std::vector<float> h(t.numel());
-    CUDA_CHECK(cudaMemcpy(h.data(), t.data, t.bytes(), cudaMemcpyDeviceToHost));
-    return h;
-}
 
 struct Moments {
     double mean, std;

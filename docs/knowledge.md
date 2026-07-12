@@ -155,6 +155,98 @@ weight-decay rent coefficient; effective shrink per step is `lr·λ`.
   pinned (`cudaMallocHost`) skips the staging and enables true async —
   the reason the DataLoader uses a pinned staging buffer.
 
+## Linear layers: backward is just more matmuls
+
+For `y = x·Wᵀ` (W stored [out, in], PyTorch convention), the gradients are
+computed *literally* by matrix multiplication — no new kind of operation:
+
+    forward:   y  = x · Wᵀ
+    backward:  dx = dy · W        (grad w.r.t. the input)
+               dW += dyᵀ · x      (grad w.r.t. the weight; accumulates)
+
+Why: x[i][k] touched every output y[i][j] with coefficient W[j][k], so its
+gradient collects each output's gradient weighted by the same coefficient —
+dx[i][k] = Σⱼ dy[i][j]·W[j][k], which is by definition the product dy·W.
+`dy` is the gradient arriving from the layers above (in isolated layer tests:
+fabricated random noise). Three GEMMs, one layer — Linear is ~15 lines.
+
+PyTorch parallel: `requires_grad=True` gives a tensor a same-shaped `.grad`
+companion (≙ our Param{weight, grad}); `y.backward(dy)` chain-rules through
+the recorded graph and deposits results into every `.grad` (accumulating,
+like our invariant 9).
+
+### The two streams meeting in backward
+
+    FORWARD (saved):   x₁ ─▶ [norm] ─▶ x₂ ─▶ [linear] ─▶ x₃ ─▶ [head] ─▶ loss
+    BACKWARD (flows):     ◀─dx₁─      ◀─dx₂─         ◀─dx₃─          ◀─ dloss
+
+Backward at layer k needs two ingredients and yields two products:
+- needs `dy` — the gradient arriving from the layer above (= that layer's
+  `dx`; the baton is transformed at every hop, never "the same dy"), and
+  `x` — the layer's own forward input, REMEMBERED (an activation, not a
+  gradient — why the planner retains buffers after forward).
+- yields `dW` (kept for its own weights) and `dx` (becomes the next layer
+  down's `dy`; without it the chain snaps and everything below learns
+  nothing). Exception: the embedding passes no dx — no gradient into
+  integer token ids.
+
+`dW` never touches weights inside backward: the optimizer step (a separate
+loop phase, after ALL grads are complete) applies `w -= lr·(…)` over
+flat(Grad) in one fused kernel.
+
+## Attention's shape story (per sequence; full mechanics in Phase 6)
+
+1. **Projections** (weights involved, ordinary Linears): x `[T,C]` →
+   Q, K, V, each `[T,C]`, via `x·Wq/k/vᵀ`. Tokens are rows.
+2. **Head split** (no math, slicing + permute): head h owns its own 64 of
+   the 384 channels → `Q_h [T,hd]`, `K_h [T,hd]`. Different slices,
+   different numbers per head — nothing repeated.
+3. **Scores** (NO weights — activation × activation):
+   `scores_h = Q_h · K_hᵀ` → `[T,hd]·[hd,T] = [T,T]` — every token's query
+   dotted with every token's key. B·H = 192 private little GEMMs → one
+   rank-3 batched matmul call.
+
+## Strided-batched GEMM
+
+One launch = batch-many INDEPENDENT 2-D GEMMs in parallel (each with full
+`α·A_i·B_i + β·C_i` semantics). The batch axis of a `[batch, rows, cols]`
+tensor is only iterated, never multiplied along — slice i of A meets only
+slice i of B. "Strided": all slices live in one contiguous buffer, item i at
+`base + i·stride` (stride = rows·cols) — one pointer + one stride per tensor
+instead of a pointer list. This is attention's shape: B·H = 192 heads, each
+its own private QKᵀ, one launch instead of 192.
+
+## GEMM efficiency: why "% of nominal peak" is measured against a fantasy
+
+Two structural discounts sit between a GPU's nominal FP32 peak and what any
+GEMM can achieve — compute both before judging a benchmark number:
+
+**1. The roofline.** A GEMM must move its operands; if the bytes take longer
+than the math, bandwidth binds. Arithmetic intensity AI = FLOPs / bytes
+(minimum traffic: read A, B; write C); the ridge point is
+`peak_flops / mem_bandwidth` (≈36 FLOP/B on RTX A5000). Shapes with AI below
+the ridge are memory-bound: their true ceiling is `bandwidth · AI`, not the
+compute peak. Our batched attention scores (AI ≈ 21) cap at ~59% of nominal
+*by physics* — small per-batch matrices additionally waste tiles/launches,
+which is exactly what flash-attention-style fusion (M3) recovers.
+
+**2. The Ampere-consumer shared pipe.** `sm_86`'s "128 FP32 cores/SM" are
+64 dedicated FP32 + 64 shared FP32-or-INT32 units; nominal peak assumes all
+128 do FMAs every cycle, but real kernels must issue integer work (addresses,
+counters, predicates) which steals shared-half slots. Empirically, cuBLAS
+SGEMM on GA10x tops out at ~55–65% of nominal even for huge square matrices.
+(A100-class SMs are balanced differently — MFU numbers don't compare across
+GPU classes.)
+
+Methodology: the bench's CEILING case (4096³ square GEMM — maximal AI, no
+quantization) measures the empirical arch ceiling once; judge every shape
+against `min(ceiling, its roofline)`. Our M1 projections at 54–57% of nominal
+are at/near that practical ceiling — nothing is "missing".
+
+Escape hatch deliberately declined for M1: TF32 tensor cores would lift the
+compute roof ~4× at 10-bit mantissa cost — a precision-policy decision
+(would break 1e-5 golden tolerances), not a wrapper default.
+
 ## Blocks, SMs, and choosing a block size
 
 A block runs *entirely on one SM* (never split), but an SM hosts **multiple
