@@ -1,0 +1,10 @@
+{
+  "device": "NVIDIA RTX 4000 Ada Generation",
+  "peak_bw_gbs": 360.0,
+  "cases": [
+    {"name": "rmsnorm  [131072,384]", "ms": 1.2996, "gbs": 310.2, "pct_peak": 86.2},
+    {"name": "gelu     [131072,1536]", "ms": 5.3043, "gbs": 303.6, "pct_peak": 84.3},
+    {"name": "residual [131072,384]", "ms": 1.9955, "gbs": 302.7, "pct_peak": 84.1},
+    {"name": "softmax  [3072,256,256] causal", "ms": 3.9380, "gbs": 306.7, "pct_peak": 85.2}
+  ]
+}

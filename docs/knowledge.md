@@ -194,6 +194,16 @@ Backward at layer k needs two ingredients and yields two products:
 loop phase, after ALL grads are complete) applies `w -= lr·(…)` over
 flat(Grad) in one fused kernel.
 
+## The three non-GEMM ops, one line each
+
+- **RMSNorm** standardizes what enters a block: `y = x/√(mean(x²)+eps) · g` —
+  volume regulation per token vector (rstd saved for backward).
+- **GELU** makes depth nonlinear: smooth "pass positive, squash negative"
+  between the MLP's matrices — without it, stacked Linears collapse into one.
+- **Softmax** converts "how relevant" scores into "how much attention"
+  weights: positive, sum to 1, soft-winner-take-most; the max-subtraction is
+  purely overflow safety; causal-masked entries get exactly 0.
+
 ## Attention's shape story (per sequence; full mechanics in Phase 6)
 
 1. **Projections** (weights involved, ordinary Linears): x `[T,C]` →
@@ -274,3 +284,157 @@ file-local constant in each kernel family, never a global.
 **Rule of thumb**: smallest multiple of 32 that satisfies the kernel's
 cooperation needs — elementwise kernels need none (256 is generous),
 reductions want the row to fit, only shared-memory tiling argues for large.
+
+## Precision: which type governs what, per kernel
+
+Storage dtype always comes from the tensors (template `T`, honored at
+load/store). Arithmetic precision is a *policy* axis only where the hardware
+has a real dial: `gemm_compute` selects the tensor-core multiply mode
+(FP32/TF32/BF16/FP16 — the only place narrow arithmetic is faster), and
+`reduce` selects accumulator precision (GEMM accumulators, norm/softmax sums
+— kept separate because the standard bf16 mode is *multiply in bf16,
+accumulate in fp32*). All other non-GEMM arithmetic is fp32 **by design**,
+not by policy: those kernels are memory-bound, so narrower math saves
+nothing and only adds rounding — expressed once as the
+`kernel_compute_t = float` alias, never as bare literals. A kernel's
+interface carries exactly the policy axes that apply to it:
+
+| Kernel | Storage | Elementwise arithmetic | Accumulation / reduction | Takes |
+|---|---|---|---|---|
+| `matmul` | T (uniform A/B/C) | `policy.gemm_compute` | `policy.reduce` (Lt derives scale type from the pair) | `RunCtx` |
+| `rmsnorm_fwd` | T | `kernel_compute_t` | `policy.reduce` — sum-of-squares and `rstd` dtype | `RunCtx` |
+| `softmax_fwd` | T | `kernel_compute_t` (exp, scale) | `policy.reduce` — max/sum | `RunCtx` |
+| `gelu_fwd` | T | `kernel_compute_t` | — | stream |
+| `residual_fwd` | T | `kernel_compute_t` | — | stream |
+| `fill_value` | T (value checked) | — | — | stream |
+
+Capability today: every axis FP32, each enforced by its own labeled guard.
+
+## Grid math: threads launched = work units × threads per unit
+
+Elementwise kernels assign **1 thread per element**, so blocks =
+ceil(n / block_size) and thread count ≈ element count. Cooperative kernels
+assign a **team per work unit** — rmsnorm/softmax give each row a 32-thread
+warp (coalesced loads + register-shuffle reduction) — so the grid is counted
+in units per block (`ceil(n_rows / kWarpsPerBlock)`, 8 rows per 256-thread
+block), and total threads = 32 × rows *by design*, not by accident. When
+checking a launch, always ask "what is the work unit and how many threads
+own one?" — comparing raw thread count to element count only works in the
+1-thread-per-unit case.
+
+## Attention scores: Tq, Tk, and the causal triangle
+
+The score tensor is [batch, Tq, Tk]. Both trailing axes count token
+positions, in different roles: row q = "token q asking" (query), column
+k = "token k being looked at" (key); scores[b][q][k] = how much q attends
+to k. In self-attention both roles are played by the same T tokens
+(T = sequence length), so Tq = Tk = T and the matrix is square — and only
+then does "column q" mean "my own position", which is what the causal rule
+cuts at. Causal = keep yourself and earlier (k ≤ q), mask the future
+(--- entries get probability exactly 0):
+
+|            | k=the | k=cat | k=sat | k=down |
+|------------|-------|-------|-------|--------|
+| **q=the**  | s00   | ---   | ---   | ---    |
+| **q=cat**  | s10   | s11   | ---   | ---    |
+| **q=sat**  | s20   | s21   | s22   | ---    |
+| **q=down** | s30   | s31   | s32   | s33    |
+
+When the axes differ (KV-cache decode: Tq=1 against Tk=500 cached keys;
+cross-attention), rows and columns index different sequences, "column q"
+is meaningless, and the kernel's Tq == Tk check refuses — the mask must
+then come from an explicit alignment, not from squareness.
+
+## Counted vs actual bytes: the rmsnorm 69% post-mortem
+
+The bandwidth bench counts *compulsory* traffic (each algorithm input read
+once, each output written once) and trusts caches to absorb re-reads. That
+trust failed for rmsnorm: its write pass re-reads the row, and a
+kernel-variant bisection (A4500, 2026-07-17) showed the re-read largely
+misses and returns to DRAM:
+
+| variant (same [8192,384] shapes) | % peak | verdict |
+|---|---|---|
+| elementwise single-pass | 85.2 | baseline = residual |
+| warp-per-row single-pass | 78.7 | row mapping: −6 pts |
+| two passes, no re-read | 82.0 | reduction + phase gap ≈ free |
+| two passes with re-read (= rmsnorm) | 67.8 | **re-read: −14 pts** |
+| rmsnorm with warp_sum removed | 69.4 | shuffle barrier: 0 pts |
+
+At a full miss the kernel moves 12 B/elem vs 8 counted → 434 GB/s counted
+≈ 650 GB/s actual: the DRAM bus is near-saturated. Lessons: (1) a low
+%-of-peak can mean "accounting undercounts real traffic", not "bus idle" —
+check that before hunting kernel inefficiencies; (2) don't assume L1 holds
+a row across two loop passes — with ~48 resident warps streaming, it
+doesn't (store hints were a no-op, so read-stream churn/policy suffices to
+evict; exact mechanism unpinned without counters); (3) cheap fix when it
+matters (M2): keep the row in
+registers across passes (12 floats/lane at C=384) — the no-reread variant
+shows ≈ +13 pts. Method note: when ncu is unavailable (RunPod blocks GPU
+perf counters — ERR_NVGPUCTRPERM), single-variable kernel variants answer
+"why slow" questions almost as well.
+
+**Epilogue — mechanism closed (RTX 4000 Ada, 2026-07-18).** An occupancy
+sweep (persistent grid-stride warps, 48→8 warps/SM, no shared-memory
+carveout confound) showed a ZERO re-read/no-reread gap at every occupancy
+on Ada — so L1 never held the rows anywhere, and the L1 reuse-distance
+theory was wrong too. The real story is one level down: **the re-read is
+served by L2 iff L2 outsizes the GPU-wide churn between a line's touches**
+(~7 MB reads+writes at these shapes). A4000 (4 MB L2): re-reads fall to
+DRAM → 67.7%. A4500 (6 MB): partial → 69%. Ada (40 MB): free → rmsnorm
+86.2%, best of the four kernels. Consequences: (a) the M2 register-caching
+fix only pays on small-L2 parts — on workstation Ada the naive kernel is
+already at the DRAM ceiling; (b) a bandwidth bench whose tensors fit L2
+measures L2, not DRAM — the unscaled [8192,·] shapes hit 327–570% "of
+peak" on Ada; bench shapes are now 16× in the batch axes (≥ 200 MB per
+tensor) and the header prints the device's L2 size as a tripwire.
+
+**Confirmation (A4500, 5 MiB L2, 2026-07-18, scaled shapes).** Predictions
+held on one device: rmsnorm 70.0% depressed WHILE softmax held 84.1%
+(differential test); gelu/residual 89%. The occupancy sweep in the DRAM
+regime showed the gap collapsing monotonically 24 → 3 pts as warps/SM drop
+48 → 8, with the re-read kernel reaching 83.3% at 1 block/SM — so
+L2-aware occupancy capping genuinely recovers ~20 pts on small-L2 parts
+(threshold lower than the naive ~7 MB churn estimate: effective L2 reuse
+capacity < nominal). Still dominated by the register fix for production
+(no occupancy dependence, no device model), but validated as a technique.
+
+## Cache-hint intrinsics (per-access, since replacement policy is fixed)
+
+L1/L2 replacement policy is hardware; what CUDA exposes is a cache *hint*
+per load/store. The governing rule: **a hint only pays when it protects a
+reuse from eviction** — allocating a line costs nothing by itself; the cost
+is always the victim it evicts. Also: L1 does not survive kernel
+boundaries, so L1-allocating a store that isn't re-read *in-kernel* is pure
+cost; L2 does persist across kernels (producer → consumer).
+
+| intrinsic | meaning | use when |
+|---|---|---|
+| default / `__ldca` | cache normally in L1+L2 | data re-read in-kernel (rmsnorm pass-1 rows, softmax rows, g) |
+| `__ldcg` | load via L2 only, skip L1 | reused across blocks but not within (rare here) |
+| `__ldcs` | load, evict-first in L1+L2 | streamed input never revisited |
+| `__ldlu` | load, "last use" — drop after | final re-read of data nothing else needs |
+| `__stcg` | store via L2 only, skip L1 | output not re-read in-kernel but consumed by the NEXT kernel (rmsnorm y, softmax probs) |
+| `__stcs` | store, evict-first in L1+L2 | output nobody reads soon (also downgrades the L2 copy — beware) |
+
+Tried and reverted (5.8, A4000, same-pod A/B): `__stcg` on rmsnorm/softmax
+output stores changed nothing (67.5% vs 67.7% — noise). Conclusion: sm_86
+evidently doesn't allocate stores in L1 by default, so there was nothing to
+bypass — and the "write allocations push the working set past L1" theory of
+the rmsnorm gap is out (the actual mechanism — L2 vs churn — is closed in
+the post-mortem epilogue above). NOT applied to gelu/residual: single-pass
+kernels have no reuse, hence no victim worth protecting — hints there
+change nothing.
+
+## Scaling the register-cached-row fix with C
+
+Per-thread burden is C ÷ (threads per row) — scale the TEAM, not the
+per-thread array. Tiers: (1) C ≤ ~1 K: warp-per-row, C/32 floats per lane
+in registers (needs compile-time C buckets: register arrays must be
+statically indexed, else they silently spill to "local memory" = L1/L2/DRAM
+— the re-read rebuilt); (2) C ~1–8 K: block-per-row, C/256 per thread,
+two-stage reduction (xor-shuffle within warps, warp partials meet in a few
+bytes of shared memory + one __syncthreads); (3) larger / runtime C: stage
+the whole row in shared memory (~100 KB/block on sm_86 ≈ C 25K, explicitly
+managed, no spill cliff). Register pressure trades against occupancy
+(64 K regs/SM), so tier 1 dies by ~48 regs/lane, not at 255.

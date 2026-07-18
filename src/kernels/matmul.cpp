@@ -28,9 +28,10 @@
 //
 // ── Precision
 //
-// Storage dtypes flow from the tensors; compute/scale types are queried from
-// the ctx's PrecisionPolicy (invariant 3). Each has a single capability guard
-// for the paths implemented so far. Notably TF32 is not a silent default:
+// Storage dtypes flow from the tensors; the Lt compute/scale types are derived
+// from the ctx policy's gemm_compute/reduce pair (invariant 3). Each has a
+// single capability guard for the paths implemented so far. Notably TF32 is
+// not a silent default:
 // its 10-bit mantissa would break the 1e-5-rel golden tolerances — enabling
 // it is a policy decision.
 
@@ -38,9 +39,7 @@
 
 #include <cublasLt.h>
 
-#include <cstdarg>
-#include <cstdio>
-#include <cstdlib>
+#include <initializer_list>
 #include <unordered_map>
 
 #include "llmt/core/error.h"
@@ -50,16 +49,6 @@
 namespace llmt::kernels {
 
 namespace {
-
-[[noreturn]] void fatal(const char* fmt, ...) noexcept {
-    va_list args;
-    va_start(args, fmt);
-    std::fprintf(stderr, "[llmt] matmul: ");
-    std::vfprintf(stderr, fmt, args);
-    std::fprintf(stderr, "\n");
-    va_end(args);
-    std::abort();
-}
 
 // llmt dtype → cuBLASLt data type (kept exhaustive by -Wall).
 cudaDataType_t lt_dtype(DType d) noexcept {
@@ -71,18 +60,19 @@ cudaDataType_t lt_dtype(DType d) noexcept {
     return CUDA_R_32F;  // unreachable
 }
 
-// PrecisionPolicy → the cuBLASLt compute type (arithmetic precision of the
-// multiply-accumulate) and the scale type (alpha/beta dtype) Lt mandates for
-// it — the pairing is Lt's rule, so they are decided together, here only.
-// Capability guard (single point): only strict-FP32 compute is implemented.
+// PrecisionPolicy → the cuBLASLt compute type (the policy's gemm_compute
+// multiply mode paired with its reduce accumulator dtype) and the scale type
+// (alpha/beta dtype) Lt mandates for it — the pairing is Lt's rule, so they
+// are decided together, here only. Capability guard (single point): only
+// strict-FP32 compute is implemented.
 struct LtComputeSpec {
     cublasComputeType_t compute;
     cudaDataType_t scale;
 };
 LtComputeSpec lt_compute_spec(const PrecisionPolicy& p) noexcept {
-    if (p.compute != DType::FP32 || p.reduce != DType::FP32)
-        fatal("compute/reduce precision %s/%s not yet supported", dtype_name(p.compute),
-              dtype_name(p.reduce));
+    if (p.gemm_compute != DType::FP32 || p.reduce != DType::FP32)
+        detail::fatal("matmul", "gemm_compute/reduce precision %s/%s not yet supported",
+              dtype_name(p.gemm_compute), dtype_name(p.reduce));
     return {CUBLAS_COMPUTE_32F, CUDA_R_32F};
 }
 
@@ -148,7 +138,7 @@ void run(const RunCtx& ctx, const Problem& p, float* c_data, const float* a_data
     d.c = make_layout(p.dtype, p.m, p.n, p.batch, p.stride_c);
 
     if (ctx.algo_cache == nullptr)
-        fatal("RunCtx has no algo cache (build the ctx via Device::make_ctx)");
+        detail::fatal("matmul", "RunCtx has no algo cache (build the ctx via Device::make_ctx)");
     const AlgoKey key{p.m, p.n, p.k, p.batch,
                       (p.trans_a ? 1LL : 0LL) | (p.trans_b ? 2LL : 0LL),
                       static_cast<int64_t>(p.dtype), static_cast<int64_t>(spec.compute),
@@ -168,7 +158,7 @@ void run(const RunCtx& ctx, const Problem& p, float* c_data, const float* a_data
                                                     &result, &n_results));
         cublasLtMatmulPreferenceDestroy(pref);
         if (n_results == 0)
-            fatal("no algorithm for m=%lld n=%lld k=%lld batch=%lld",
+            detail::fatal("matmul", "no algorithm for m=%lld n=%lld k=%lld batch=%lld",
                   static_cast<long long>(p.m), static_cast<long long>(p.n),
                   static_cast<long long>(p.k), static_cast<long long>(p.batch));
         it = cache.emplace_hint(it, key, result.algo);
@@ -185,15 +175,17 @@ void run(const RunCtx& ctx, const Problem& p, float* c_data, const float* a_data
 Problem check(const Tensor& c, const Tensor& a, const Tensor& b, bool trans_a,
               bool trans_b) noexcept {
     const int rank = c.shape.rank;
-    if (rank != 2 && rank != 3) fatal("expected rank-2 or rank-3 tensors (got %d)", rank);
-    for (const Tensor* t : {&c, &a, &b}) {
-        if (t->shape.rank != rank) fatal("mixed ranks in one matmul");
-        if (t->dtype != a.dtype) fatal("mixed dtypes in one matmul");
-        if (!t->valid()) fatal("invalid tensor (null data)");
+    if (rank != 2 && rank != 3)
+        detail::fatal("matmul", "expected rank-2 or rank-3 tensors (got %d)", rank);
+    for (const Tensor* t : std::initializer_list<const Tensor*>{&c, &a, &b}) {
+        if (t->shape.rank != rank) detail::fatal("matmul", "mixed ranks in one matmul");
+        if (t->dtype != a.dtype) detail::fatal("matmul", "mixed dtypes in one matmul");
+        if (!t->valid()) detail::fatal("matmul", "invalid tensor (null data)");
     }
     // Capability guard (single point): the FP32 compute path is the only one
     // implemented; layouts/keys/plumbing are dtype-generic above and below.
-    if (a.dtype != DType::FP32) fatal("dtype %s not yet supported", dtype_name(a.dtype));
+    if (a.dtype != DType::FP32)
+        detail::fatal("matmul", "dtype %s not yet supported", dtype_name(a.dtype));
     const int r = rank - 2;  // row axis (0 for 2-D, 1 for 3-D)
     Problem p{};
     p.dtype = a.dtype;
@@ -203,13 +195,15 @@ Problem check(const Tensor& c, const Tensor& a, const Tensor& b, bool trans_a,
     p.k = trans_a ? a.shape[r] : a.shape[r + 1];
     const int64_t kb = trans_b ? b.shape[r + 1] : b.shape[r];
     p.n = trans_b ? b.shape[r] : b.shape[r + 1];
-    if (p.k != kb) fatal("inner dims disagree: %lld vs %lld", static_cast<long long>(p.k),
-                         static_cast<long long>(kb));
-    if (c.shape[r] != p.m || c.shape[r + 1] != p.n) fatal("C shape mismatch");
+    if (p.k != kb)
+        detail::fatal("matmul", "inner dims disagree: %lld vs %lld", static_cast<long long>(p.k),
+                      static_cast<long long>(kb));
+    if (c.shape[r] != p.m || c.shape[r + 1] != p.n) detail::fatal("matmul", "C shape mismatch");
 
     if (rank == 3) {
         p.batch = a.shape[0];
-        if (b.shape[0] != p.batch || c.shape[0] != p.batch) fatal("batch sizes disagree");
+        if (b.shape[0] != p.batch || c.shape[0] != p.batch)
+            detail::fatal("matmul", "batch sizes disagree");
         p.stride_a = a.shape[1] * a.shape[2];
         p.stride_b = b.shape[1] * b.shape[2];
         p.stride_c = c.shape[1] * c.shape[2];

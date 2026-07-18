@@ -6,12 +6,17 @@
 
 #include <cuda_runtime.h>
 
-#include <cstdint>
+#include "llmt/core/tensor.h"
 
 namespace llmt::kernels {
 
-/** Fill dst[0..n) with value on stream s (non-zero floats aren't memset-able). */
-void fill_value(cudaStream_t s, float* dst, int64_t n, float value) noexcept;
+/**
+ * Fills every element of dst with value (non-zero fills aren't memset-able).
+ * T must be the C++ type of dst's dtype — mismatches abort. Instantiated
+ * in fill.cu.
+ */
+template <TensorElement T>
+void fill_value(cudaStream_t s, Tensor& dst, T value) noexcept;
 
 }  // namespace llmt::kernels
 

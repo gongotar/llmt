@@ -50,4 +50,12 @@ struct dtype_of<int32_t> {
 };
 // bf16's C++ type (__nv_bfloat16) gets its specialization in M2.
 
+/**
+ * A C++ type usable as a tensor element — i.e., one with a DType mapping.
+ * Constrains element-type templates (Tensor::ptr, kernel value parameters)
+ * so an unmapped type fails at the call site with the requirement named.
+ */
+template <typename T>
+concept TensorElement = requires { dtype_of<T>::value; };
+
 }  // namespace llmt

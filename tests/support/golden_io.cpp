@@ -4,9 +4,10 @@
 
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <fstream>
+
+#include "llmt/core/error.h"
 
 #ifndef LLMT_GOLDEN_DIR
 #error "LLMT_GOLDEN_DIR must be defined by the build (tests/CMakeLists.txt)"
@@ -20,8 +21,7 @@ constexpr uint32_t kMagic = 0x544D4C4C;  // "LLMT"
 constexpr uint32_t kVersion = 1;
 
 [[noreturn]] void die(const std::string& path, const char* why) noexcept {
-    std::fprintf(stderr, "[llmt-test] golden file '%s': %s\n", path.c_str(), why);
-    std::abort();
+    detail::fatal("golden file", "'%s': %s", path.c_str(), why);
 }
 
 }  // namespace

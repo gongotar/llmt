@@ -1,0 +1,30 @@
+{
+  "case": "softmax",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "x": {
+      "shape": [
+        3,
+        6,
+        6
+      ],
+      "dtype": "float32"
+    },
+    "y_none": {
+      "shape": [
+        3,
+        6,
+        6
+      ],
+      "dtype": "float32"
+    },
+    "y_causal": {
+      "shape": [
+        3,
+        6,
+        6
+      ],
+      "dtype": "float32"
+    }
+  }
+}

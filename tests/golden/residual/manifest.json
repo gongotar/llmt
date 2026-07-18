@@ -1,0 +1,27 @@
+{
+  "case": "residual",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "a": {
+      "shape": [
+        4,
+        33
+      ],
+      "dtype": "float32"
+    },
+    "b": {
+      "shape": [
+        4,
+        33
+      ],
+      "dtype": "float32"
+    },
+    "out": {
+      "shape": [
+        4,
+        33
+      ],
+      "dtype": "float32"
+    }
+  }
+}

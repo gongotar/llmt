@@ -2,9 +2,6 @@
 // Copyright (c) 2026 Masoud Jami
 #ifdef LLMT_HAS_CUDA
 
-#include <cstdarg>
-#include <cstdio>
-#include <cstdlib>
 #include <utility>
 #include <vector>
 
@@ -15,16 +12,6 @@ namespace llmt {
 
 namespace {
 
-[[noreturn]] void fatal(const char* fmt, ...) noexcept {
-    va_list args;
-    va_start(args, fmt);
-    std::fprintf(stderr, "[llmt] ParamStore: ");
-    std::vfprintf(stderr, fmt, args);
-    std::fprintf(stderr, "\n");
-    va_end(args);
-    std::abort();
-}
-
 constexpr size_t align_up(size_t n) noexcept {
     return (n + Arena::kAlign - 1) / Arena::kAlign * Arena::kAlign;
 }
@@ -34,15 +21,16 @@ constexpr size_t align_up(size_t n) noexcept {
 ParamStore::ParamStore(StateDtypes dtypes) noexcept : m_dtypes(dtypes) {
     for (int k = 0; k < kNumStateKinds; ++k)
         if (dtypes[StateKind(k)] != DType::FP32)
-            fatal("storage dtype %s for state kind %d is not supported by the kernels",
-                  dtype_name(dtypes[StateKind(k)]), k);
+            detail::fatal("ParamStore", "storage dtype %s for state kind %d is not supported",
+                          dtype_name(dtypes[StateKind(k)]), k);
 }
 
 Param& ParamStore::add(std::string name, const Shape& shape, Role role) noexcept {
-    if (finalized()) fatal("add('%s') after finalize()", name.c_str());
-    if (name.empty()) fatal("empty parameter name");
-    if (shape.numel() <= 0) fatal("add('%s'): empty shape", name.c_str());
-    if (m_index.count(name)) fatal("duplicate parameter name '%s'", name.c_str());
+    if (finalized()) detail::fatal("ParamStore", "add('%s') after finalize()", name.c_str());
+    if (name.empty()) detail::fatal("ParamStore", "empty parameter name");
+    if (shape.numel() <= 0) detail::fatal("ParamStore", "add('%s'): empty shape", name.c_str());
+    if (m_index.count(name))
+        detail::fatal("ParamStore", "duplicate parameter name '%s'", name.c_str());
 
     Param p;
     p.name = std::move(name);
@@ -57,14 +45,15 @@ Param& ParamStore::add(std::string name, const Shape& shape, Role role) noexcept
 
 void ParamStore::alias(const std::string& alias_name, const std::string& target) noexcept {
     const auto it = m_index.find(target);
-    if (it == m_index.end()) fatal("alias target '%s' is not registered", target.c_str());
+    if (it == m_index.end())
+        detail::fatal("ParamStore", "alias target '%s' is not registered", target.c_str());
     if (!m_index.try_emplace(alias_name, it->second).second)
-        fatal("alias name '%s' already exists", alias_name.c_str());
+        detail::fatal("ParamStore", "alias name '%s' already exists", alias_name.c_str());
 }
 
 void ParamStore::finalize() noexcept {
-    if (finalized()) fatal("finalize() called twice");
-    if (m_params.empty()) fatal("finalize() with no registered parameters");
+    if (finalized()) detail::fatal("ParamStore", "finalize() called twice");
+    if (m_params.empty()) detail::fatal("ParamStore", "finalize() with no registered parameters");
 
     // Per-kind packing: each parameter starts 256B-aligned within its span;
     // sizes come from each tensor's own dtype, so kinds may pack differently.
@@ -96,7 +85,7 @@ void ParamStore::finalize() noexcept {
 
 const Param& ParamStore::at(const std::string& name) const noexcept {
     const auto it = m_index.find(name);
-    if (it == m_index.end()) fatal("unknown parameter '%s'", name.c_str());
+    if (it == m_index.end()) detail::fatal("ParamStore", "unknown parameter '%s'", name.c_str());
     return m_params[it->second];
 }
 
@@ -105,7 +94,8 @@ Param& ParamStore::at(const std::string& name) noexcept {
 }
 
 Tensor ParamStore::flat(StateKind k) const noexcept {
-    if (!finalized()) fatal("flat(%d) requested before finalize()", static_cast<int>(k));
+    if (!finalized())
+        detail::fatal("ParamStore", "flat(%d) requested before finalize()", static_cast<int>(k));
     const int ki = static_cast<int>(k);
     const DType dt = m_dtypes[k];
     return Tensor{m_base[ki], dt, {static_cast<int64_t>(m_span_bytes[ki] / dtype_size(dt))}};

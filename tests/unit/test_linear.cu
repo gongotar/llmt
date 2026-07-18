@@ -4,6 +4,7 @@
 // vs PyTorch autograd; grad ACCUMULATION proven by running backward twice.
 #include <vector>
 
+#include "check.h"
 #include "doctest.h"
 #include "golden_io.h"
 #include "llmt/core/arena.h"
@@ -14,18 +15,6 @@
 
 using namespace llmt;
 using namespace llmt::testing;
-
-namespace {
-
-void check_close(const Tensor& actual, const HostTensor& expected, double scale = 1.0) {
-    const std::vector<float> h = download(actual);
-    std::vector<float> e(expected.ptr<float>(), expected.ptr<float>() + expected.numel());
-    for (float& v : e) v *= static_cast<float>(scale);
-    const CloseReport r = allclose(h.data(), e.data(), expected.numel(), 1e-5, 1e-6);
-    CHECK_MESSAGE(r.ok, to_string(r));
-}
-
-}  // namespace
 
 TEST_CASE("Linear: forward and backward match the oracle; dW accumulates") {
     Device dev(0);
@@ -50,16 +39,19 @@ TEST_CASE("Linear: forward and backward match the oracle; dW accumulates") {
 
     lin.forward(ctx, y, x);
     dev.synchronize();
-    check_close(y, g.tensor("y"));
+    check_close(y, g.tensor("y"), 1e-5, 1e-6);
 
     lin.backward(ctx, dx, dy, x);
     dev.synchronize();
-    check_close(dx, g.tensor("dx"));
-    check_close(lin.param().grad, g.tensor("dw"));
+    check_close(dx, g.tensor("dx"), 1e-5, 1e-6);
+    check_close(lin.param().grad, g.tensor("dw"), 1e-5, 1e-6);
 
     // The accumulation contract (invariant 9): a second backward must ADD —
     // the grad is now exactly twice the oracle's.
     lin.backward(ctx, dx, dy, x);
     dev.synchronize();
-    check_close(lin.param().grad, g.tensor("dw"), /*scale=*/2.0);
+    HostTensor dw2 = g.tensor("dw");
+    float* v = reinterpret_cast<float*>(dw2.bytes.data());
+    for (int64_t i = 0; i < dw2.numel(); ++i) v[i] *= 2.0f;
+    check_close(lin.param().grad, dw2, 1e-5, 1e-6);
 }

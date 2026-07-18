@@ -1,16 +1,34 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (c) 2026 Masoud Jami
-// Error-checking macros for CUDA / cuBLASLt calls (docs/DESIGN.md task 0.6).
-// Every runtime API call in the library goes through one of these.
+// Fatal-error reporting and error-checking macros for CUDA / cuBLASLt calls
+// (docs/DESIGN.md task 0.6). Every runtime API call goes through a macro;
+// contract violations go through detail::fatal.
 #pragma once
+
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+
+namespace llmt::detail {
+
+/** Prints "[llmt] <where>: <formatted message>" to stderr and aborts —
+ *  the library's response to contract violations (nothing throws). */
+[[noreturn]] inline void fatal(const char* where, const char* fmt, ...) noexcept {
+    va_list args;
+    va_start(args, fmt);
+    std::fprintf(stderr, "[llmt] %s: ", where);
+    std::vfprintf(stderr, fmt, args);
+    std::fprintf(stderr, "\n");
+    va_end(args);
+    std::abort();
+}
+
+}  // namespace llmt::detail
 
 #ifdef LLMT_HAS_CUDA
 
 #include <cublasLt.h>
 #include <cuda_runtime.h>
-
-#include <cstdio>
-#include <cstdlib>
 
 #define CUDA_CHECK(call)                                                          \
     do {                                                                          \

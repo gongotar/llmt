@@ -13,6 +13,7 @@
 #include "llmt/core/error.h"
 #include "llmt/core/rng.h"
 #include "llmt/kernels/matmul.h"
+#include "timing.h"
 
 using namespace llmt;
 
@@ -22,26 +23,6 @@ struct Case {
     const char* label;
     int64_t batch, m, n, k;  // batch = 1 → plain GEMM
 };
-
-double time_ms(const Device& dev, const RunCtx& ctx, Tensor& c, const Tensor& a, const Tensor& b,
-               int iters) {
-    const auto call = [&] { kernels::matmul(ctx, c, a, b, false, true, 1.0f, 0.0f); };
-    for (int i = 0; i < 3; ++i) call();  // warmup + algo-cache fill
-    dev.synchronize();
-
-    cudaEvent_t t0 = nullptr, t1 = nullptr;
-    CUDA_CHECK(cudaEventCreate(&t0));
-    CUDA_CHECK(cudaEventCreate(&t1));
-    CUDA_CHECK(cudaEventRecord(t0, ctx.stream));
-    for (int i = 0; i < iters; ++i) call();
-    CUDA_CHECK(cudaEventRecord(t1, ctx.stream));
-    CUDA_CHECK(cudaEventSynchronize(t1));
-    float ms = 0.0f;
-    CUDA_CHECK(cudaEventElapsedTime(&ms, t0, t1));
-    CUDA_CHECK(cudaEventDestroy(t0));
-    CUDA_CHECK(cudaEventDestroy(t1));
-    return static_cast<double>(ms) / iters;
-}
 
 }  // namespace
 
@@ -78,7 +59,9 @@ int main() {
         rng::fill_normal(ctx.stream, a.ptr<float>(), a.numel(), 1, 1, 0.0f, 1.0f);
         rng::fill_normal(ctx.stream, b.ptr<float>(), b.numel(), 1, 2, 0.0f, 1.0f);
 
-        const double ms = time_ms(dev, ctx, c, a, b, /*iters=*/20);
+        const double ms = bench::time_ms(dev, ctx.stream, /*warmup=*/3, /*iters=*/20, [&] {
+            kernels::matmul(ctx, c, a, b, false, true, 1.0f, 0.0f);
+        });
         const double tflops = 2.0 * cs.batch * cs.m * cs.n * cs.k / (ms * 1e-3) / 1e12;
         std::printf("%-42s %10.3f %10.2f %7.1f%%\n", cs.label, ms, tflops,
                     100.0 * tflops / dev.props().peak_fp32_tflops);

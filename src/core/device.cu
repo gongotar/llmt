@@ -30,6 +30,7 @@ Device::Device(int index) noexcept : m_index(index) {
     m_props.sm_minor = p.minor;
     m_props.sm_count = p.multiProcessorCount;
     m_props.vram_bytes = p.totalGlobalMem;
+    m_props.l2_bytes = static_cast<size_t>(p.l2CacheSize);
 
     // Attribute API (the cudaDeviceProp clock fields are deprecated in CUDA 12).
     int clock_khz = 0, mem_clock_khz = 0, bus_width_bits = 0;

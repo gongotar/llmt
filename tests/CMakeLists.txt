@@ -15,6 +15,7 @@ if(LLMT_HAS_CUDA)
         unit/test_param_store.cu
         unit/test_matmul.cu
         unit/test_linear.cu
+        unit/test_kernels_fwd.cu
     )
 endif()
 target_link_libraries(llmt_tests PRIVATE llmt)

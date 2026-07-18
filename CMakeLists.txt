@@ -18,15 +18,18 @@ add_compile_options(
 include(CheckLanguage)
 check_language(CUDA)
 if(CMAKE_CUDA_COMPILER)
+    # Must be set BEFORE enable_language(CUDA): enablement initializes
+    # CMAKE_CUDA_ARCHITECTURES to the compiler default (52) if unset, which
+    # would make this guard dead code. Pods are disposable and the GPU model
+    # varies per session: build for whatever is present. Override with
+    # -DCMAKE_CUDA_ARCHITECTURES.
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES OR CMAKE_CUDA_ARCHITECTURES STREQUAL "")
+        set(CMAKE_CUDA_ARCHITECTURES native)
+    endif()
     enable_language(CUDA)
     set(LLMT_HAS_CUDA ON)
     set(CMAKE_CUDA_STANDARD 20)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES OR CMAKE_CUDA_ARCHITECTURES STREQUAL "")
-        # Pods are disposable and the GPU model varies per session:
-        # build for whatever is present. Override with -DCMAKE_CUDA_ARCHITECTURES.
-        set(CMAKE_CUDA_ARCHITECTURES native)
-    endif()
     option(LLMT_LINEINFO "Add -lineinfo to CUDA builds (Nsight source correlation)" OFF)
     message(STATUS "llmt: CUDA enabled (arch ${CMAKE_CUDA_ARCHITECTURES})")
 else()
@@ -45,7 +48,11 @@ if(LLMT_HAS_CUDA)
         src/core/device.cu
         src/core/rng.cu
         src/kernels/fill.cu
+        src/kernels/gelu.cu
         src/kernels/matmul.cpp
+        src/kernels/residual.cu
+        src/kernels/rmsnorm.cu
+        src/kernels/softmax.cu
         src/layers/linear.cpp
         src/model/init.cpp
         src/model/param_store.cpp

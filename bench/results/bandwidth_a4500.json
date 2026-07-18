@@ -1,0 +1,10 @@
+{
+  "device": "NVIDIA RTX A4500",
+  "peak_bw_gbs": 640.1,
+  "cases": [
+    {"name": "rmsnorm  [131072,384]", "ms": 0.9003, "gbs": 447.8, "pct_peak": 70.0},
+    {"name": "gelu     [131072,1536]", "ms": 2.8150, "gbs": 572.1, "pct_peak": 89.4},
+    {"name": "residual [131072,384]", "ms": 1.0562, "gbs": 571.9, "pct_peak": 89.3},
+    {"name": "softmax  [3072,256,256] causal", "ms": 2.2427, "gbs": 538.6, "pct_peak": 84.1}
+  ]
+}

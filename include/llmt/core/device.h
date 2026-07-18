@@ -24,6 +24,7 @@ struct DeviceProps {
     int sm_major = 0, sm_minor = 0;
     int sm_count = 0;
     size_t vram_bytes = 0;
+    size_t l2_bytes = 0;  // bandwidth benches must exceed this or they measure L2, not DRAM
     double peak_fp32_tflops = 0.0;
     double peak_bw_gbs = 0.0;
 };

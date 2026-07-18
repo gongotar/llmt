@@ -5,6 +5,7 @@
 #include <cstring>
 #include <vector>
 
+#include "check.h"
 #include "doctest.h"
 #include "golden_io.h"
 #include "llmt/core/arena.h"
@@ -15,16 +16,6 @@
 
 using namespace llmt;
 using namespace llmt::testing;
-
-namespace {
-
-void check_close(const Tensor& actual, const HostTensor& expected) {
-    const std::vector<float> h = download(actual);
-    const CloseReport r = allclose(h.data(), expected.ptr<float>(), expected.numel(), 1e-5, 1e-6);
-    CHECK_MESSAGE(r.ok, to_string(r));
-}
-
-}  // namespace
 
 TEST_CASE("matmul: four transpose combos vs oracle") {
     Device dev(0);
@@ -40,19 +31,19 @@ TEST_CASE("matmul: four transpose combos vs oracle") {
 
     kernels::matmul(ctx, c, a, b, false, false, 1.0f, 0.0f);
     dev.synchronize();
-    check_close(c, g.tensor("c_nn"));
+    check_close(c, g.tensor("c_nn"), 1e-5, 1e-6);
 
     kernels::matmul(ctx, c, a, bt, false, true, 1.0f, 0.0f);
     dev.synchronize();
-    check_close(c, g.tensor("c_nt"));
+    check_close(c, g.tensor("c_nt"), 1e-5, 1e-6);
 
     kernels::matmul(ctx, c, at, b, true, false, 1.0f, 0.0f);
     dev.synchronize();
-    check_close(c, g.tensor("c_tn"));
+    check_close(c, g.tensor("c_tn"), 1e-5, 1e-6);
 
     kernels::matmul(ctx, c, at, bt, true, true, 1.0f, 0.0f);
     dev.synchronize();
-    check_close(c, g.tensor("c_tt"));
+    check_close(c, g.tensor("c_tt"), 1e-5, 1e-6);
 }
 
 TEST_CASE("matmul: beta=1 accumulates into C") {
@@ -67,7 +58,7 @@ TEST_CASE("matmul: beta=1 accumulates into C") {
 
     kernels::matmul(ctx, c, a, b, false, false, 1.0f, /*beta=*/1.0f);
     dev.synchronize();
-    check_close(c, g.tensor("c_beta"));
+    check_close(c, g.tensor("c_beta"), 1e-5, 1e-6);
 }
 
 TEST_CASE("matmul rank-3: plain batch and the QK^T pattern") {
@@ -81,7 +72,7 @@ TEST_CASE("matmul rank-3: plain batch and the QK^T pattern") {
     Tensor c = arena.alloc({3, 4, 5}, DType::FP32);
     kernels::matmul(ctx, c, a, b, false, false, 1.0f, 0.0f);
     dev.synchronize();
-    check_close(c, g.tensor("c"));
+    check_close(c, g.tensor("c"), 1e-5, 1e-6);
 
     // scores = q @ k^T per batch — attention's Phase 6 shape.
     const Tensor q = upload(arena, g.tensor("q"), ctx.stream);
@@ -89,7 +80,7 @@ TEST_CASE("matmul rank-3: plain batch and the QK^T pattern") {
     Tensor scores = arena.alloc({3, 4, 4}, DType::FP32);
     kernels::matmul(ctx, scores, q, k, false, true, 1.0f, 0.0f);
     dev.synchronize();
-    check_close(scores, g.tensor("scores"));
+    check_close(scores, g.tensor("scores"), 1e-5, 1e-6);
 }
 
 TEST_CASE("matmul: bitwise deterministic across calls (cached algo)") {

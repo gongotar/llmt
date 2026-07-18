@@ -9,8 +9,9 @@ Phases are ordered by dependency — later phases assume earlier ones are green.
 
 ## Current status
 
-> **Phase:** 4 ✅ done (reviewed) → starting Phase 5 (elementwise & norm kernels)
-> **Last updated:** 2026-07-03
+> **Phase:** 5 ✅ done (reviewed) → starting Phase 6 (embedding, RoPE,
+> attention forward, fused cross-entropy)
+> **Last updated:** 2026-07-18
 > **Notes:** Pod workflow proven end-to-end on RunPod Secure Cloud
 > (current pod: RTX A4000 `sm_86` 16 GB; preferred when available:
 > RTX 4000 Ada `sm_89`). `CMAKE_CUDA_ARCHITECTURES=native` since the GPU
@@ -132,17 +133,36 @@ deliverable, not an afterthought.*
 *Each kernel: naive-but-correct first, warp-shuffle reductions where they
 matter; golden test + bandwidth benchmark before moving on.*
 
-- [ ] 5.1 `rmsnorm_fwd` (saves `rstd` for backward), one warp/block per row.
-- [ ] 5.2 `gelu_fwd` — tanh approximation; oracle uses
+- [x] 5.1 `rmsnorm_fwd` (saves `rstd` for backward), one warp/block per row.
+- [x] 5.2 `gelu_fwd` — tanh approximation; oracle uses
       `gelu(approximate='tanh')` (recorded micro-decision).
-- [ ] 5.3 `residual_fwd` (add).
-- [ ] 5.4 `softmax_fwd` row-wise: max-subtract, exp, normalize, `MaskSpec`
+- [x] 5.3 `residual_fwd` (add).
+- [x] 5.4 `softmax_fwd` row-wise: max-subtract, exp, normalize, `MaskSpec`
       parameter (M1 implements `Causal` only; the seam exists).
-- [ ] 5.5 Golden tests for 5.1–5.4.
-- [ ] 5.6 Bandwidth benchmarks: % of peak HBM BW reported for each; recorded
-      in `bench/results/` as JSON.
-- [ ] **Exit: all four green vs oracle; norms ≥ ~50% of peak BW (naive-kernel
-      bar — refined in M2/M3).**
+- [x] 5.5 Golden tests for 5.1–5.4.
+- [x] 5.6 Bandwidth benchmarks: % of peak HBM BW reported for each; recorded
+      in `bench/results/` as JSON (A4500 + RTX 4000 Ada, L2-exceeding shapes).
+- [x] 5.7 rmsnorm at 69% of peak vs 84–88% for its siblings: RESOLVED
+      (bisection 2026-07-17 A4500 + occupancy sweep 2026-07-19 Ada; ncu
+      blocked by RunPod counter perms). Cause: the write pass re-reads x,
+      and the re-read is served by L2 only when L2 outsizes the inter-touch
+      churn (~7 MB): A4000/A4500 (4/6 MB L2) → DRAM re-reads → 67–69%
+      "accounting artifact" (bus near-saturated); RTX 4000 Ada (40 MB L2)
+      → free → 86.2%, penalty gone. NOT the reduction barrier, NOT the
+      two-phase structure, NOT L1 (zero gap at all occupancies). M2
+      register-caching note now conditional: only pays on small-L2 GPUs.
+      Bench shapes scaled 16× so tensors exceed L2 (unscaled shapes read
+      327–570% "of peak" on Ada — L2 bandwidth, not DRAM). Full story in
+      docs/knowledge.md "Counted vs actual bytes".
+- [x] 5.8 `__stcg` L1-bypassing stores on rmsnorm/softmax: NO EFFECT
+      (2026-07-18, A4000, same-pod A/B: 67.5% vs 67.7% — noise) → reverted.
+      Implies sm_86 doesn't allocate stores in L1 by default; write-allocation
+      theory of the rmsnorm gap dropped. Register caching (5.7 note) remains
+      the M2 fix.
+- [x] **Exit: all four green vs oracle; norms ≥ ~50% of peak BW (naive-kernel
+      bar — refined in M2/M3).** (32 cases / 206,362 assertions green on
+      A4500, A4000, RTX 4000 Ada; rmsnorm 70% A4500 / 86% Ada, gelu/residual
+      84–89%, softmax 84%; the rmsnorm L2 story in knowledge.md)
 
 ## Phase 6 — Embedding, RoPE, attention forward, fused cross-entropy
 
@@ -316,6 +336,7 @@ test + finite-difference spot check. After each landing: determinism check
 | Custom pod Docker image (`docker/Dockerfile` running `setup_pod.sh` as build step, pushed to Docker Hub, used as RunPod template) — adopt once `setup_pod.sh` stabilizes | M2 |
 | `scripts/pod_up.sh` / `pod_down.sh` via runpodctl/API (no web UI per session) | M2 |
 | Fused kernels (add+norm, rope+qkv) + `KernelBackend::Fused` cross-checks | M2 |
+| rmsnorm register-cached row (skip pass-2 re-read; only pays on small-L2 GPUs, see 5.7). Tiered by C: per-lane registers to C≈1K (compile-time C buckets — register arrays need static indexing or they spill); block-per-row + per-thread registers + two-stage smem reduction to C≈8K; full smem row staging beyond / for runtime C | M2 |
 | KV cache for generation | M2/M3 |
 | Flash-style attention, activation-buffer reuse/checkpointing | M3 |
 | Cache cuBLASLt descriptors alongside the cached algo (entries become RAII owners of 4 Lt handles). Trigger: profiling shows host-bound gaps between kernels (attention GEMMs most likely). Superseded entirely if CUDA graphs land | M3 |

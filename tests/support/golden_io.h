@@ -23,7 +23,7 @@ struct HostTensor {
 
     int64_t numel() const noexcept { return shape.numel(); }
 
-    template <typename T>
+    template <TensorElement T>
     const T* ptr() const noexcept {
         assert(dtype == dtype_of<T>::value);
         return reinterpret_cast<const T*>(bytes.data());

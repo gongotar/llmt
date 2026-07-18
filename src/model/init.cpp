@@ -3,9 +3,8 @@
 #ifdef LLMT_HAS_CUDA
 
 #include <cmath>
-#include <cstdio>
-#include <cstdlib>
 
+#include "llmt/core/error.h"
 #include "llmt/core/rng.h"
 #include "llmt/kernels/fill.h"
 #include "llmt/model/init.h"
@@ -13,11 +12,9 @@
 namespace llmt {
 
 void init_params(const ParamStore& store, cudaStream_t s, uint64_t seed, int n_layer) noexcept {
-    if (!store.finalized() || n_layer <= 0) {
-        std::fprintf(stderr, "[llmt] init_params: %s\n",
-                     n_layer <= 0 ? "n_layer must be positive" : "store is not finalized");
-        std::abort();
-    }
+    if (!store.finalized() || n_layer <= 0)
+        detail::fatal("init_params",
+                      n_layer <= 0 ? "n_layer must be positive" : "store is not finalized");
     const float resid_std = 0.02f / std::sqrt(2.0f * static_cast<float>(n_layer));
 
     for (const Param& p : store.params()) {
@@ -31,9 +28,11 @@ void init_params(const ParamStore& store, cudaStream_t s, uint64_t seed, int n_l
             case Role::ResidualProj:
                 rng::fill_normal(s, w, n, seed, p.stream_id(), 0.0f, resid_std);
                 break;
-            case Role::Norm:
-                kernels::fill_value(s, w, n, 1.0f);
+            case Role::Norm: {
+                Tensor weight = p.weight;  // fill takes a mutable view
+                kernels::fill_value(s, weight, 1.0f);
                 break;
+            }
         }
     }
 }

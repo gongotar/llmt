@@ -25,4 +25,12 @@ nvidia-smi --query-gpu=name,compute_cap,memory.total,driver_version --format=csv
 cmake --version | head -1
 ninja --version
 python -c "import torch; print('torch', torch.__version__, 'cuda_ok', torch.cuda.is_available())"
+# GPU perf-counter access is a host driver policy (RmProfilingAdminOnly);
+# containers can't change it — know up front whether ncu will work here.
+if grep -q 'RmProfilingAdminOnly: 0' /proc/driver/nvidia/params 2>/dev/null; then
+    echo "profiling: GPU perf counters available — ncu usable"
+else
+    echo "profiling: GPU perf counters BLOCKED on this host — ncu will fail" \
+         "(ERR_NVGPUCTRPERM); use nsys or kernel-variant bisection (docs/dev.md)"
+fi
 echo "== setup done =="

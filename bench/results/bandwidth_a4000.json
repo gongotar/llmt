@@ -1,0 +1,10 @@
+{
+  "device": "NVIDIA RTX A4000",
+  "peak_bw_gbs": 448.1,
+  "cases": [
+    {"name": "rmsnorm  [8192,384]", "ms": 0.0831, "gbs": 303.3, "pct_peak": 67.7},
+    {"name": "gelu     [8192,1536]", "ms": 0.2561, "gbs": 393.1, "pct_peak": 87.7},
+    {"name": "residual [8192,384]", "ms": 0.0992, "gbs": 380.7, "pct_peak": 85.0},
+    {"name": "softmax  [192,256,256] causal", "ms": 0.2041, "gbs": 369.9, "pct_peak": 82.6}
+  ]
+}

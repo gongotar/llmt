@@ -25,9 +25,9 @@ struct Tensor {
 
     /**
      * Typed accessor for kernel launches: t.ptr<float>().
-     * Debug builds abort on a T/dtype mismatch; unmapped T is a compile error.
+     * Debug builds abort on a T/dtype mismatch; unmapped T fails the concept.
      */
-    template <typename T>
+    template <TensorElement T>
     T* ptr() const noexcept {
         assert(dtype == dtype_of<T>::value);
         return static_cast<T*>(data);

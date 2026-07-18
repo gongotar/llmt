@@ -1,0 +1,32 @@
+{
+  "case": "rmsnorm",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "x": {
+      "shape": [
+        6,
+        48
+      ],
+      "dtype": "float32"
+    },
+    "g": {
+      "shape": [
+        48
+      ],
+      "dtype": "float32"
+    },
+    "y": {
+      "shape": [
+        6,
+        48
+      ],
+      "dtype": "float32"
+    },
+    "rstd": {
+      "shape": [
+        6
+      ],
+      "dtype": "float32"
+    }
+  }
+}

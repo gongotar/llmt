@@ -116,6 +116,53 @@ def matmul_rank3(w: CaseWriter):
 
 
 @case
+def rmsnorm(w: CaseWriter):
+    """rmsnorm_fwd (task 5.1): y = x/rms(x)·g rowwise, plus the saved rstd.
+    C=48 (not a multiple of 32) exercises the lane-stride remainder; N=6
+    exercises the partial last block (8 warps/block)."""
+    torch.manual_seed(51)
+    x = torch.randn(6, 48)
+    g = torch.randn(48)
+    eps = 1e-5
+    w.dump("x", x)
+    w.dump("g", g)
+    w.dump("y", torch.nn.functional.rms_norm(x, (48,), g, eps))
+    w.dump("rstd", torch.rsqrt(x.pow(2).mean(-1) + eps))
+
+
+@case
+def gelu(w: CaseWriter):
+    """gelu_fwd (task 5.2): tanh approximation (recorded micro-decision)."""
+    torch.manual_seed(53)
+    x = torch.randn(5, 37)  # odd numel exercises the last partial block
+    w.dump("x", x)
+    w.dump("y", torch.nn.functional.gelu(x, approximate="tanh"))
+
+
+@case
+def residual(w: CaseWriter):
+    """residual_fwd (task 5.3): out = a + b."""
+    torch.manual_seed(59)
+    a = torch.randn(4, 33)
+    b = torch.randn(4, 33)
+    w.dump("a", a)
+    w.dump("b", b)
+    w.dump("out", a + b)
+
+
+@case
+def softmax(w: CaseWriter):
+    """softmax_fwd (task 5.4): row-wise over [batch, Tq, Tk], unmasked and
+    causal (masked entries have probability exactly 0)."""
+    torch.manual_seed(61)
+    x = torch.randn(3, 6, 6)
+    w.dump("x", x)
+    w.dump("y_none", torch.softmax(x, dim=-1))
+    causal = torch.tril(torch.ones(6, 6, dtype=torch.bool))
+    w.dump("y_causal", torch.softmax(x.masked_fill(~causal, float("-inf")), dim=-1))
+
+
+@case
 def linear(w: CaseWriter):
     """Linear layer fwd+bwd (task 4.7): y = x·W^T, grads via autograd."""
     torch.manual_seed(47)

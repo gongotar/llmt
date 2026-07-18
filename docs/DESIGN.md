@@ -65,7 +65,7 @@ Calibration: llm.c trains GPT-2 in ~5k lines total; that is the M1–M2 band.
    future home of buffer-lifetime reuse and activation checkpointing.
 
 3. **Precision policy is cross-cutting.** One `PrecisionPolicy` object (master
-   weight dtype, compute dtype, reduction dtype, plus **per-layer and per-role
+   weight dtype, GEMM compute dtype, reduction dtype, plus **per-layer and per-role
    overrides** — e.g. logits/loss pinned to fp32 while blocks run bf16, or one
    specific layer held at higher precision while debugging instability).
    Layers query it; no dtype is hard-coded in a signature. M1 sets everything
