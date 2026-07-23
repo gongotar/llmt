@@ -16,6 +16,10 @@ if(LLMT_HAS_CUDA)
         unit/test_matmul.cu
         unit/test_linear.cu
         unit/test_kernels_fwd.cu
+        unit/test_embedding.cu
+        unit/test_attention.cu
+        unit/test_cross_entropy.cu
+        unit/test_mlp.cu
     )
 endif()
 target_link_libraries(llmt_tests PRIVATE llmt)

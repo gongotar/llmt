@@ -1,0 +1,34 @@
+{
+  "case": "mlp",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "x": {
+      "shape": [
+        6,
+        8
+      ],
+      "dtype": "float32"
+    },
+    "wu": {
+      "shape": [
+        16,
+        8
+      ],
+      "dtype": "float32"
+    },
+    "wd": {
+      "shape": [
+        8,
+        16
+      ],
+      "dtype": "float32"
+    },
+    "y": {
+      "shape": [
+        6,
+        8
+      ],
+      "dtype": "float32"
+    }
+  }
+}

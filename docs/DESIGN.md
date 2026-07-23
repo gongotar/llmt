@@ -389,10 +389,12 @@ final Norm → LMHead → fused cross-entropy, and drives plan/bind/forward/back
 in order (backward in reverse).
 
 **kernels/** — free functions only, e.g.
-`void rmsnorm_fwd(cudaStream_t, float* y, float* rstd, const float* x, const float* w, int N, int C);`
-Naive and fused variants share one signature; the layer picks via
-`ctx.backend`. GEMM goes through one `matmul()` wrapper owning all cuBLASLt
-setup — the only file that knows cuBLASLt exists.
+`void rmsnorm_fwd(const RunCtx& ctx, Tensor& y, Tensor& rstd, const Tensor& x, const Tensor& g, float eps) noexcept;`
+(Tensor views carry shape/dtype; kernels take the ctx only when a policy
+axis applies to them, a bare stream otherwise.) Naive and fused variants
+share one signature; the layer picks via `ctx.backend`. GEMM goes through
+one `matmul()` wrapper owning all cuBLASLt setup — the only file that
+knows cuBLASLt exists.
 
 ### 8.3 Dataflow of one training step
 

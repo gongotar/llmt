@@ -1,0 +1,42 @@
+{
+  "case": "rope",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "q": {
+      "shape": [
+        2,
+        2,
+        4,
+        6
+      ],
+      "dtype": "float32"
+    },
+    "k": {
+      "shape": [
+        2,
+        2,
+        4,
+        6
+      ],
+      "dtype": "float32"
+    },
+    "q_rot": {
+      "shape": [
+        2,
+        2,
+        4,
+        6
+      ],
+      "dtype": "float32"
+    },
+    "k_rot": {
+      "shape": [
+        2,
+        2,
+        4,
+        6
+      ],
+      "dtype": "float32"
+    }
+  }
+}

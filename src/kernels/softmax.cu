@@ -62,24 +62,31 @@ void softmax_fwd(const RunCtx& ctx, Tensor& y, const Tensor& x, MaskSpec mask) n
                       static_cast<long long>(tq), static_cast<long long>(tk));
     for (const Tensor* t : std::initializer_list<const Tensor*>{&y, &x})
         if (!t->valid()) detail::fatal("softmax_fwd", "invalid tensor (null data)");
-    // Capability guard on the reduce axis (invariant 3): only the FP32
-    // instantiation exists so far.
-    if (ctx.precision.reduce != DType::FP32)
-        detail::fatal("softmax_fwd", "no kernel instantiated for reduce precision %s",
-                      dtype_name(ctx.precision.reduce));
-
     const int64_t n_rows = x.shape[0] * tq;
     const auto grid = static_cast<unsigned>((n_rows + kWarpsPerBlock - 1) / kWarpsPerBlock);
-    switch (x.dtype) {
+    // Two-axis dispatch (invariant 3): outer switch = reduce precision,
+    // inner = storage dtype; capability = the arms that launch. TR is named
+    // inside the arm that proved it, so check and instantiation cannot
+    // drift apart.
+    switch (ctx.precision.reduce) {
         case DType::FP32:
-            softmax_fwd_kernel<float, float><<<grid, kWarpsPerBlock * kWarpSize, 0, ctx.stream>>>(
-                y.ptr<float>(), x.ptr<float>(), n_rows, tq, tk,
-                mask.kind == MaskKind::Causal);
+            switch (x.dtype) {
+                case DType::FP32:
+                    softmax_fwd_kernel<float, float>
+                        <<<grid, kWarpsPerBlock * kWarpSize, 0, ctx.stream>>>(
+                            y.ptr<float>(), x.ptr<float>(), n_rows, tq, tk,
+                            mask.kind == MaskKind::Causal);
+                    break;
+                case DType::BF16:
+                case DType::I32:
+                    detail::fatal("softmax_fwd", "no kernel instantiated for dtype %s",
+                                  dtype_name(x.dtype));
+            }
             break;
         case DType::BF16:
         case DType::I32:
-            detail::fatal("softmax_fwd", "no kernel instantiated for dtype %s",
-                          dtype_name(x.dtype));
+            detail::fatal("softmax_fwd", "no kernel instantiated for reduce precision %s",
+                          dtype_name(ctx.precision.reduce));
     }
     CUDA_CHECK_LAST();
 }

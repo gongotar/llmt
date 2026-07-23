@@ -163,6 +163,115 @@ def softmax(w: CaseWriter):
 
 
 @case
+def embedding(w: CaseWriter):
+    """embedding_fwd (task 6.1): gather rows of wte by token id. Tokens
+    include id 0, id V-1 and repeats (repeated rows must be identical)."""
+    torch.manual_seed(67)
+    wte = torch.randn(13, 8)  # [V, C]
+    tokens = torch.tensor([[0, 5, 12, 5, 3], [7, 0, 1, 12, 7]], dtype=torch.int32)
+    w.dump("wte", wte)
+    w.dump("tokens", tokens)
+    w.dump("y", wte[tokens.long()])
+
+
+@case
+def permute(w: CaseWriter):
+    """permute kernels (task 6.2): head split [B,T,3C] -> 3x[B,H,T,hd] and
+    head merge [B,H,T,hd] -> [B,T,C]. Distinct dims (B=2,T=3,H=2,hd=4) so
+    any axis mix-up changes shapes or values."""
+    torch.manual_seed(71)
+    B, T, H, hd = 2, 3, 2, 4
+    qkv = torch.randn(B, T, 3 * H * hd)
+    q, k, v = qkv.view(B, T, 3, H, hd).permute(2, 0, 3, 1, 4).unbind(0)
+    w.dump("qkv", qkv)
+    w.dump("q", q)
+    w.dump("k", k)
+    w.dump("v", v)
+    x = torch.randn(B, H, T, hd)
+    w.dump("x", x)
+    w.dump("y", x.permute(0, 2, 1, 3).reshape(B, T, H * hd))
+
+
+def _rope(x: torch.Tensor, theta: float) -> torch.Tensor:
+    """Rotate-half RoPE (HF/Llama convention — recorded micro-decision):
+    pair (d, d+hd/2), angle = t * theta^(-2d/hd)."""
+    hd = x.shape[-1]
+    half = hd // 2
+    inv = theta ** (-2.0 * torch.arange(half, dtype=torch.float32) / hd)
+    ang = torch.arange(x.shape[-2], dtype=torch.float32)[:, None] * inv[None, :]  # [T, half]
+    cos, sin = ang.cos(), ang.sin()
+    x1, x2 = x[..., :half], x[..., half:]
+    return torch.cat([x1 * cos - x2 * sin, x2 * cos + x1 * sin], dim=-1)
+
+
+@case
+def rope(w: CaseWriter):
+    """rope_fwd (task 6.3): rotate-half convention on [B,H,T,hd] views,
+    hd=6 exercises a non-power-of-two head dim."""
+    torch.manual_seed(73)
+    q = torch.randn(2, 2, 4, 6)
+    k = torch.randn(2, 2, 4, 6)
+    w.dump("q", q)
+    w.dump("k", k)
+    w.dump("q_rot", _rope(q, 10000.0))
+    w.dump("k_rot", _rope(k, 10000.0))
+
+
+@case
+def attention(w: CaseWriter):
+    """Naive attention forward (tasks 6.5/6.6), per-stage so a failure
+    localizes itself: scaled scores, causal probs, PV output, merged heads.
+    The output is cross-checked against F.scaled_dot_product_attention."""
+    torch.manual_seed(79)
+    B, H, T, hd = 2, 2, 4, 6
+    q = torch.randn(B, H, T, hd)
+    k = torch.randn(B, H, T, hd)
+    v = torch.randn(B, H, T, hd)
+    scores = (q @ k.transpose(-2, -1)) / hd**0.5
+    causal = torch.tril(torch.ones(T, T, dtype=torch.bool))
+    probs = torch.softmax(scores.masked_fill(~causal, float("-inf")), dim=-1)
+    out = probs @ v
+    ref = torch.nn.functional.scaled_dot_product_attention(q, k, v, is_causal=True)
+    assert torch.allclose(out, ref, atol=1e-6), "manual stages disagree with sdpa"
+    for name, t in [("q", q), ("k", k), ("v", v), ("scores", scores), ("probs", probs),
+                    ("out", out)]:
+        w.dump(name, t)
+    w.dump("merged", out.permute(0, 2, 1, 3).reshape(B, T, H * hd))
+
+
+@case
+def cross_entropy(w: CaseWriter):
+    """Fused cross-entropy forward (task 6.7): per-token NLL from logits,
+    loss_mask-weighted mean (mask contains zeros)."""
+    torch.manual_seed(83)
+    B, T, V = 2, 4, 11
+    logits = torch.randn(B, T, V) * 3  # spread exercises the max-subtract path
+    targets = torch.randint(0, V, (B, T))
+    mask = torch.tensor([[1.0, 1.0, 0.0, 1.0], [1.0, 0.0, 1.0, 1.0]])
+    nll = torch.nn.functional.cross_entropy(
+        logits.reshape(-1, V), targets.reshape(-1), reduction="none").reshape(B, T)
+    w.dump("logits", logits)
+    w.dump("targets", targets.to(torch.int32))
+    w.dump("mask", mask)
+    w.dump("wnll", nll * mask)
+    w.dump("loss", (nll * mask).sum() / mask.sum())
+
+
+@case
+def mlp(w: CaseWriter):
+    """MLP layer forward (task 6.8): y = gelu_tanh(x . Wu^T) . Wd^T, no biases."""
+    torch.manual_seed(89)
+    x = torch.randn(6, 8)
+    wu = torch.randn(16, 8)  # [d_ff, C]
+    wd = torch.randn(8, 16)  # [C, d_ff]
+    h = torch.nn.functional.gelu(x @ wu.T, approximate="tanh")
+    w.dump("x", x)
+    w.dump("wu", wu)
+    w.dump("wd", wd)
+    w.dump("y", h @ wd.T)
+
+
+@case
 def linear(w: CaseWriter):
     """Linear layer fwd+bwd (task 4.7): y = x·W^T, grads via autograd."""
     torch.manual_seed(47)

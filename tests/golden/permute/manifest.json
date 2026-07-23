@@ -1,0 +1,58 @@
+{
+  "case": "permute",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "qkv": {
+      "shape": [
+        2,
+        3,
+        24
+      ],
+      "dtype": "float32"
+    },
+    "q": {
+      "shape": [
+        2,
+        2,
+        3,
+        4
+      ],
+      "dtype": "float32"
+    },
+    "k": {
+      "shape": [
+        2,
+        2,
+        3,
+        4
+      ],
+      "dtype": "float32"
+    },
+    "v": {
+      "shape": [
+        2,
+        2,
+        3,
+        4
+      ],
+      "dtype": "float32"
+    },
+    "x": {
+      "shape": [
+        2,
+        2,
+        3,
+        4
+      ],
+      "dtype": "float32"
+    },
+    "y": {
+      "shape": [
+        2,
+        3,
+        8
+      ],
+      "dtype": "float32"
+    }
+  }
+}

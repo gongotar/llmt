@@ -307,8 +307,38 @@ interface carries exactly the policy axes that apply to it:
 | `gelu_fwd` | T | `kernel_compute_t` | — | stream |
 | `residual_fwd` | T | `kernel_compute_t` | — | stream |
 | `fill_value` | T (value checked) | — | — | stream |
+| `cross_entropy_fwd` | T (logits/mask) | `kernel_compute_t` (exp, log) | `policy.reduce` — max/lse/mean accumulators; but loss & row_nll STORE as `host_result_t` | `RunCtx` |
+
+A second fixed alias, `host_result_t = float` (precision.h): results
+published to the host (the loss scalar, per-token NLL) never inherit the
+reduce dtype — those tensors are tiny, so narrowing buys no bandwidth and
+only quantizes the numbers training is steered by (an fp8 reduce would
+turn the loss curve into a ~0.5-step staircase). reduce governs how sums
+are CARRIED; what the host reads is a publication contract. (Same reason
+PyTorch AMP returns fp32 losses.) rstd is different: device-internal,
+consumed by backward under the same policy — it keeps the reduce dtype.
 
 Capability today: every axis FP32, each enforced by its own labeled guard.
+
+## The attention layout sandwich (why permute exists)
+
+Token-row land is where Linears live (one [C] row per token); per-head land
+[B, H, T, hd] is where the batched attention GEMMs and softmax live (each
+head's [T, hd] block contiguous = one batch entry). permute_split /
+permute_merge are the border crossings — pure copies, no arithmetic:
+
+  x [B,T,C] → Linear(qkv) → split → rope → attention_fwd → Linear(Wo)
+              token rows   ┕━ per-head land [B,H,T,hd] ━┙  token rows
+
+Merge runs as attention_fwd's last stage (settled: the op takes
+per-head q/k/v and returns token rows — the future fused kernel writes
+token rows natively, so the shared-signature seam wants merge inside; the
+naive-only scratch tensors are simply invalid under the fused backend).
+The backward pass mirrors the roles (grads get split where activations were
+merged and vice versa). llmt Tensors are deliberately stride-less, so the
+per-head "view" is materialized by a copy instead of stride tricks; the two
+copies are memory-bound noise next to the GEMMs, and M3's fused attention
+absorbs the whole sandwich.
 
 ## Grid math: threads launched = work units × threads per unit
 
@@ -438,3 +468,18 @@ bytes of shared memory + one __syncthreads); (3) larger / runtime C: stage
 the whole row in shared memory (~100 KB/block on sm_86 ≈ C 25K, explicitly
 managed, no spill cliff). Register pressure trades against occupancy
 (64 K regs/SM), so tier 1 dies by ~48 regs/lane, not at 255.
+
+## Reading 4-D index math: flatten to 2-D first
+
+Row-major [B, H, T, hd] is byte-identical to a 2-D matrix [B·H·T, hd]:
+B·H·T rows of hd numbers. Any element access is then just
+`row_index · hd + column`. The row index is NOT a product of b, h, t — it
+is the count of rows before yours, odometer-style (t ticks fastest):
+every earlier b contributes H·T rows, every earlier h contributes T,
+plus t:
+
+  i = b·(H·T) + h·T + t = (b·H + h)·T + t
+  offset = i·hd + d          ← the kernels' ((b·H + h)·T + t)·hd + d
+
+Every nested-parentheses address in the permute/rope/attention kernels is
+this one pattern applied to that tensor's own axis order.

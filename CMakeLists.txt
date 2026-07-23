@@ -47,13 +47,19 @@ if(LLMT_HAS_CUDA)
         src/core/arena.cu
         src/core/device.cu
         src/core/rng.cu
+        src/kernels/attention.cpp
+        src/kernels/cross_entropy.cu
+        src/kernels/embedding.cu
         src/kernels/fill.cu
         src/kernels/gelu.cu
         src/kernels/matmul.cpp
+        src/kernels/permute.cu
         src/kernels/residual.cu
         src/kernels/rmsnorm.cu
+        src/kernels/rope.cu
         src/kernels/softmax.cu
         src/layers/linear.cpp
+        src/layers/mlp.cpp
         src/model/init.cpp
         src/model/param_store.cpp
     )

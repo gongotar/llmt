@@ -59,23 +59,30 @@ void rmsnorm_fwd(const RunCtx& ctx, Tensor& y, Tensor& rstd, const Tensor& x, co
                       dtype_name(rstd.dtype), dtype_name(ctx.precision.reduce));
     for (const Tensor* t : std::initializer_list<const Tensor*>{&y, &rstd, &x, &g})
         if (!t->valid()) detail::fatal("rmsnorm_fwd", "invalid tensor (null data)");
-    // Capability guard on the reduce axis (invariant 3): only the FP32
-    // instantiation exists so far.
-    if (ctx.precision.reduce != DType::FP32)
-        detail::fatal("rmsnorm_fwd", "no kernel instantiated for reduce precision %s",
-                      dtype_name(ctx.precision.reduce));
-
     const auto grid = static_cast<unsigned>((n_rows + kWarpsPerBlock - 1) / kWarpsPerBlock);
-    switch (x.dtype) {
+    // Two-axis dispatch (invariant 3): outer switch = reduce precision,
+    // inner = storage dtype; capability = the arms that launch. TR is named
+    // inside the arm that proved it, so check and instantiation cannot
+    // drift apart.
+    switch (ctx.precision.reduce) {
         case DType::FP32:
-            rmsnorm_fwd_kernel<float, float><<<grid, kWarpsPerBlock * kWarpSize, 0, ctx.stream>>>(
-                y.ptr<float>(), rstd.ptr<float>(), x.ptr<float>(), g.ptr<float>(), n_rows, n_cols,
-                eps);
+            switch (x.dtype) {
+                case DType::FP32:
+                    rmsnorm_fwd_kernel<float, float>
+                        <<<grid, kWarpsPerBlock * kWarpSize, 0, ctx.stream>>>(
+                            y.ptr<float>(), rstd.ptr<float>(), x.ptr<float>(), g.ptr<float>(),
+                            n_rows, n_cols, eps);
+                    break;
+                case DType::BF16:
+                case DType::I32:
+                    detail::fatal("rmsnorm_fwd", "no kernel instantiated for dtype %s",
+                                  dtype_name(x.dtype));
+            }
             break;
         case DType::BF16:
         case DType::I32:
-            detail::fatal("rmsnorm_fwd", "no kernel instantiated for dtype %s",
-                          dtype_name(x.dtype));
+            detail::fatal("rmsnorm_fwd", "no kernel instantiated for reduce precision %s",
+                          dtype_name(ctx.precision.reduce));
     }
     CUDA_CHECK_LAST();
 }

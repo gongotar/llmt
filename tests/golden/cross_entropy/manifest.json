@@ -1,0 +1,41 @@
+{
+  "case": "cross_entropy",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "logits": {
+      "shape": [
+        2,
+        4,
+        11
+      ],
+      "dtype": "float32"
+    },
+    "targets": {
+      "shape": [
+        2,
+        4
+      ],
+      "dtype": "int32"
+    },
+    "mask": {
+      "shape": [
+        2,
+        4
+      ],
+      "dtype": "float32"
+    },
+    "wnll": {
+      "shape": [
+        2,
+        4
+      ],
+      "dtype": "float32"
+    },
+    "loss": {
+      "shape": [
+        1
+      ],
+      "dtype": "float32"
+    }
+  }
+}

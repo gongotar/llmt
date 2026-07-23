@@ -1,0 +1,28 @@
+{
+  "case": "embedding",
+  "torch_version": "2.12.1",
+  "tensors": {
+    "wte": {
+      "shape": [
+        13,
+        8
+      ],
+      "dtype": "float32"
+    },
+    "tokens": {
+      "shape": [
+        2,
+        5
+      ],
+      "dtype": "int32"
+    },
+    "y": {
+      "shape": [
+        2,
+        5,
+        8
+      ],
+      "dtype": "float32"
+    }
+  }
+}

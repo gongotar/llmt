@@ -32,4 +32,15 @@ struct PrecisionPolicy {
  */
 using kernel_compute_t = float;
 
+/**
+ * Storage type of results whose designed consumer is HOST code, not another
+ * kernel (the loss scalar, per-token NLL diagnostics) — also fixed,
+ * deliberately not policy-driven. Tensors consumed on-device (rstd,
+ * activations) may follow the policy: producer and consumer change
+ * together. These don't: the host reader sits outside the policy, and the
+ * tensors are tiny, so narrowing buys no bandwidth and only quantizes the
+ * numbers training is steered by (logging, LR decisions, golden compares).
+ */
+using host_result_t = float;
+
 }  // namespace llmt

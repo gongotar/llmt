@@ -9,9 +9,9 @@ Phases are ordered by dependency — later phases assume earlier ones are green.
 
 ## Current status
 
-> **Phase:** 5 ✅ done (reviewed) → starting Phase 6 (embedding, RoPE,
-> attention forward, fused cross-entropy)
-> **Last updated:** 2026-07-18
+> **Phase:** 6 ✅ done (reviewed) → starting Phase 7 (planner, Block, GPT
+> forward)
+> **Last updated:** 2026-07-23
 > **Notes:** Pod workflow proven end-to-end on RunPod Secure Cloud
 > (current pod: RTX A4000 `sm_86` 16 GB; preferred when available:
 > RTX 4000 Ada `sm_89`). `CMAKE_CUDA_ARCHITECTURES=native` since the GPU
@@ -166,22 +166,24 @@ matter; golden test + bandwidth benchmark before moving on.*
 
 ## Phase 6 — Embedding, RoPE, attention forward, fused cross-entropy
 
-- [ ] 6.1 `embedding_fwd`: gather `[B,T] → [B,T,C]`.
-- [ ] 6.2 `permute` kernels: `[B,T,3C] → 3×[B,H,T,hd]` (post-QKV split) and
+- [x] 6.1 `embedding_fwd`: gather `[B,T] → [B,T,C]`.
+- [x] 6.2 `permute` kernels: `[B,T,3C] → 3×[B,H,T,hd]` (post-QKV split) and
       `[B,H,T,hd] → [B,T,C]` (pre-out-proj merge). Golden-tested — permutes
       are a classic silent-bug site.
-- [ ] 6.3 `rope_fwd` applied to Q and K views (`rope_theta` from config).
-- [ ] 6.4 `MaskSpec` struct in the public attention op signature (Causal only).
-- [ ] 6.5 Naive attention forward: batched-strided QKᵀ GEMM → scale → masked
+- [x] 6.3 `rope_fwd` applied to Q and K views (`rope_theta` from config).
+- [x] 6.4 `MaskSpec` struct in the public attention op signature (Causal only).
+- [x] 6.5 Naive attention forward: batched-strided QKᵀ GEMM → scale → masked
       softmax (probs overwrite scores in place) → PV GEMM → merge heads.
-- [ ] 6.6 Golden test: attention fwd vs
+- [x] 6.6 Golden test: attention fwd vs
       `torch.nn.functional.scaled_dot_product_attention` (+ manual per-stage
       goldens: scores, probs — so a failure localizes itself).
-- [ ] 6.7 `cross_entropy_fwd` fused: from logits `[B,T,V]` — row max,
+- [x] 6.7 `cross_entropy_fwd` fused: from logits `[B,T,V]` — row max,
       log-sum-exp, per-token NLL, `loss_mask`-weighted mean → single scalar.
       Numerically stable; golden test incl. a mask with zeros.
-- [ ] 6.8 MLP layer (Linear → GELU → Linear) composed; golden fwd test.
-- [ ] **Exit: every layer's forward matches oracle at 1e-5 rel.**
+- [x] 6.8 MLP layer (Linear → GELU → Linear) composed; golden fwd test.
+- [x] **Exit: every layer's forward matches oracle at 1e-5 rel.** (39 cases
+      / 206,398 assertions green on RTX A4000; per-stage attention goldens
+      cross-checked against F.scaled_dot_product_attention)
 
 ## Phase 7 — Planner, Block, GPT forward
 
